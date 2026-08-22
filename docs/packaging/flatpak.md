@@ -1,8 +1,8 @@
 # Flatpak Packaging
 
-Use this page when you need to build, install, or bundle the Flatpak package.
+Use this page when you need to build, install, or bundle the Flatpak package for **Sudo-Ivan/Vortex-Linux**.
 
-## Recommended: prebuilt assembly (Vortex-Linux)
+## Recommended: prebuilt assembly (this fork)
 
 This fork's supported Flatpak path packages an already-built
 `linux-unpacked` tree from `pnpm run package:linux` (or the Linux package CI job).

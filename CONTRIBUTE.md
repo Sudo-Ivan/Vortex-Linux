@@ -1,5 +1,11 @@
 # Contributing
 
+This tree is **[Sudo-Ivan/Vortex-Linux](https://github.com/Sudo-Ivan/Vortex-Linux)**, a Linux packaging fork of [Nexus-Mods/Vortex](https://github.com/Nexus-Mods/Vortex).
+
+- Linux zip / AppImage / Flatpak and fork CI changes: contribute here
+- Upstream application changes that are not Linux-packaging specific: prefer upstream when practical
+- See the README **What this fork changes** and **Upstream sync** sections before large merges
+
 Recommended editor: [VS Code] with workspace extensions.
 You will be prompted to install them when you first open the repo.
 

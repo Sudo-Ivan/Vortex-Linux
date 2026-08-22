@@ -4,7 +4,7 @@ How to build and update the Flatpak package.
 
 ## Recommended release path (prebuilt)
 
-For this Vortex-Linux fork, assemble Flatpak from a prebuilt
+For **Sudo-Ivan/Vortex-Linux**, assemble Flatpak from a prebuilt
 `linux-unpacked` tree. That is what CI uses and what you should use for
 local release bundles:
 

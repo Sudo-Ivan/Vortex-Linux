@@ -3,13 +3,58 @@
 </p>
 
 <p align="center">
+<strong>Vortex-Linux</strong> — Linux fork by
+<a href="https://github.com/Sudo-Ivan">Sudo-Ivan</a>
+<br/>
+Upstream:
+<a href="https://github.com/Nexus-Mods/Vortex">Nexus-Mods/Vortex</a>
+</p>
+
+<p align="center">
+<a href="https://github.com/Sudo-Ivan/Vortex-Linux/releases"><img src="https://img.shields.io/github/v/release/Sudo-Ivan/Vortex-Linux?include_prereleases&style=for-the-badge&label=Linux%20releases" alt="Linux releases"></a>
+<a href="https://github.com/Sudo-Ivan/Vortex-Linux/actions/workflows/package-linux.yml"><img src="https://img.shields.io/github/actions/workflow/status/Sudo-Ivan/Vortex-Linux/package-linux.yml?style=for-the-badge&label=Package%20Linux" alt="Package Linux"></a>
+<a href="https://github.com/Nexus-Mods/Vortex"><img src="https://img.shields.io/badge/upstream-Nexus--Mods%2FVortex-orange?style=for-the-badge" alt="Upstream Vortex"></a>
+</p>
+
+<p align="center">
 <a href="https://discord.gg/nexusmods"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
 <a href="https://twitter.com/nexussites"><img src="https://img.shields.io/badge/twitter-000000?style=for-the-badge&logo=x&logoColor=white" alt="X (formally Twitter)"></a>
 <a href="https://www.youtube.com/c/NexusModsYT"><img src="https://img.shields.io/badge/YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="YouTube"></a>
-<a href="https://www.instagram.com/nexusmodsofficial/"><img src="https://img.shields.io/badge/Instagram-E4405F?style=for-the-badge&logo=instagram&logoColor=white" alt="Instagram"></a>
 <a href="https://www.reddit.com/r/nexusmods/"><img src="https://img.shields.io/badge/Reddit-FF4500?style=for-the-badge&logo=reddit&logoColor=white" alt="Reddit"></a>
-<a href="https://www.facebook.com/nexussites/"><img src="https://img.shields.io/badge/Facebook-1877F2?style=for-the-badge&logo=facebook&logoColor=white" alt="Facebook"></a>
 </p>
+
+## This is a fork
+
+**[Sudo-Ivan/Vortex-Linux](https://github.com/Sudo-Ivan/Vortex-Linux)** is an unofficial Linux-oriented fork of [Nexus-Mods/Vortex](https://github.com/Nexus-Mods/Vortex).
+
+- Linux packaging and CI live here
+- Issues for Linux builds, Flatpak, AppImage, and fork CI belong **in this repo**
+- Upstream Windows releases and general Vortex product support remain with Nexus Mods
+
+This fork is not affiliated with or endorsed by Nexus Mods / Black Tree Gaming Ltd.
+
+## What this fork changes
+
+Ship-and-run focus: build, start, and distribute Vortex on Linux while keeping deltas easy to merge from upstream.
+
+| Area | Change |
+| --- | --- |
+| Packaging | `pnpm run package:linux` builds **zip** + **AppImage** |
+| electron-builder | Linux targets, artifact names, publish to this fork |
+| Dist prepare | Platform-safe `extraResources` (Windows redistributables not required on Linux) |
+| CI | `.github/workflows/package-linux.yml` + `.github/actions/package-linux/` |
+| Flatpak | Prebuilt assemble from `linux-unpacked` (not broken offline yarn source build) |
+| Fork CI | Bundled-actions rebuild falls back to `GITHUB_TOKEN` when Nexus App secrets are absent |
+| GitLab | Stale `build:all` / `lint:ci` scripts mapped to `build` / `lint` |
+| Docs | Linux install, packaging, and upstream-sync notes |
+
+### Explicit non-goals (for now)
+
+- Full Windows feature parity (LOOT/BSA natives, GOG/Origin/Xbox store discovery, UAC elevation)
+- Publishing to Nexus R2 or Nexus-Mods/Vortex releases
+- Flathub submission (local/CI `.flatpak` bundles only)
+
+Upstream already includes Linux path helpers, Steam/Proton support, and Ubuntu CI build/test. This fork concentrates on **shipping** Linux artifacts.
 
 ## Introduction
 
@@ -31,21 +76,15 @@ Our approach with Vortex aims to take complex tasks such as sorting your load or
 
 - **Extensions and Plugins** - Vortex is released under a GPL-3.0 License, giving our community the ability to write extensions and frameworks which can then interact with Vortex, continually adding to its functionality.
 
-## Getting Started (this fork)
+## Getting started on Linux
 
-This repository is **[Sudo-Ivan/Vortex-Linux](https://github.com/Sudo-Ivan/Vortex-Linux)**, a Linux-oriented fork of upstream [Nexus-Mods/Vortex](https://github.com/Nexus-Mods/Vortex).
+### Download
 
-### Linux packages
+When available, use [GitHub Releases](https://github.com/Sudo-Ivan/Vortex-Linux/releases) for zip / AppImage / Flatpak from this fork.
 
-GitHub Actions workflow **Package Linux** (`.github/workflows/package-linux.yml`) builds:
+Or run the **Package Linux** workflow: [Actions → Package Linux](https://github.com/Sudo-Ivan/Vortex-Linux/actions/workflows/package-linux.yml).
 
-- Portable `.zip`
-- `.AppImage`
-- Optional `.flatpak` bundle (assembled from the prebuilt `linux-unpacked` tree)
-
-Artifacts appear on [Releases](https://github.com/Sudo-Ivan/Vortex-Linux/releases) when a draft release is requested, or as workflow artifacts.
-
-### Build and run on Linux
+### Build from source
 
 ```bash
 pnpm install
@@ -53,7 +92,7 @@ pnpm run build
 pnpm run start
 ```
 
-Package zip + AppImage locally:
+Package zip + AppImage:
 
 ```bash
 pnpm run package:linux
@@ -68,15 +107,15 @@ python3 flatpak/scripts/flatpak_bundle_prebuilt.py \
   --output dist/vortex-<version>.flatpak
 ```
 
-See [CONTRIBUTE.md](CONTRIBUTE.md) and [docs/packaging/flatpak.md](docs/packaging/flatpak.md).
+More detail: [CONTRIBUTE.md](CONTRIBUTE.md), [docs/packaging/flatpak.md](docs/packaging/flatpak.md), distro guides under `docs/install-instructions/`.
 
 ### Upstream Windows builds
 
-Official Windows installers remain available from [Nexus Mods](https://www.nexusmods.com/site/mods/1?tab=files) and [upstream GitHub releases](https://github.com/Nexus-Mods/Vortex/releases/latest).
+Official Windows installers remain at [Nexus Mods](https://www.nexusmods.com/site/mods/1?tab=files) and [upstream GitHub releases](https://github.com/Nexus-Mods/Vortex/releases/latest).
 
 ## Upstream sync
 
-Keep this fork easy to merge with Nexus-Mods/Vortex:
+This fork is meant to stay close to Nexus-Mods/Vortex:
 
 ```bash
 git remote add upstream https://github.com/Nexus-Mods/Vortex.git
@@ -88,26 +127,29 @@ After a merge, re-check fork-owned paths:
 
 - `.github/workflows/package-linux.yml`
 - `.github/actions/package-linux/`
-- `package:linux` scripts in root and `src/main/package.json`
-- `src/main/electron-builder.config.json` Linux section / `extraResources` handling
-- `src/main/prepare-dist-package.mjs` platform `extraResources` patch
-- `flatpak/com.nexusmods.vortex.prebuilt.yaml` and `flatpak/scripts/flatpak_bundle_prebuilt.py`
+- `.github/workflows/actions-check.yml` (GITHUB_TOKEN fallback)
+- `package:linux` in root `package.json` and `src/main/package.json`
+- `src/main/electron-builder.config.json` (Linux targets / publish)
+- `src/main/prepare-dist-package.mjs` (platform `extraResources`)
+- `flatpak/com.nexusmods.vortex.prebuilt.yaml`
+- `flatpak/scripts/flatpak_bundle_prebuilt.py`
+- `.gitlab-ci.yml` script names
+- README / Flatpak docs for this fork
 
 ## Resources
 
-- [This fork](https://github.com/Sudo-Ivan/Vortex-Linux) for Linux packages and Linux-focused issues
-- [Upstream Vortex](https://github.com/Nexus-Mods/Vortex) for source history and Windows releases
+- [This fork](https://github.com/Sudo-Ivan/Vortex-Linux) — Linux packages, Flatpak, fork CI, Linux issues
+- [Upstream Vortex](https://github.com/Nexus-Mods/Vortex) — source history and Windows releases
 - [Download Vortex (Windows)](https://www.nexusmods.com/site/mods/1?tab=files) from Nexus Mods
-- [Vortex Forum](https://forums.nexusmods.com/index.php?/forum/4306-vortex-support/) or [Discord](https://discord.gg/nexusmods) for support and discussions with the community and the team.
-- [Vortex Wiki](https://github.com/Nexus-Mods/Vortex/wiki) for knowledge base, articles and troubleshooting
+- [Vortex Forum](https://forums.nexusmods.com/index.php?/forum/4306-vortex-support/) or [Discord](https://discord.gg/nexusmods)
+- [Vortex Wiki](https://github.com/Nexus-Mods/Vortex/wiki)
 
 ## Contributing
 
-The majority of Vortex code is open-source. We are committed to a transparent development process and highly appreciate any contributions. Whether you are helping us fix bugs, proposing new features, improving our documentation or spreading the word - we would love to have you as a part of the Vortex community.
+- **Linux packaging / Flatpak / this fork's CI:** open issues and PRs on [Sudo-Ivan/Vortex-Linux](https://github.com/Sudo-Ivan/Vortex-Linux/issues)
+- **General Vortex bugs and features:** prefer upstream [Nexus-Mods/Vortex](https://github.com/Nexus-Mods/Vortex/issues) when the issue is not Linux-packaging specific
 
-- Bug Report: If you see an error message or encounter an issue while using our application, please create a [bug report](https://github.com/Nexus-Mods/Vortex/issues/new?assignees=&labels=&projects=&template=bug_report.md&title=).
-- Feature Request: If you have an idea or if there is a capability that is missing and would make development easier and more robust, please submit a [feature request](https://github.com/Nexus-Mods/Vortex/issues/new?assignees=&labels=&projects=&template=feature_request.md&title=).
-- Review Extension: If you're creating a game extension and need us to review it, please submit a [review extension](https://github.com/Nexus-Mods/Vortex/issues/new?assignees=&labels=extension+%3Agear%3A&projects=&template=review-extension.yaml&title=Review%3A+Game+Name) request.
+Setup and local development: [CONTRIBUTE.md](CONTRIBUTE.md).
 
 ## License
 
