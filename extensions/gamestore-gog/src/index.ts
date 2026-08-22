@@ -1,17 +1,140 @@
 import * as path from "path";
 
-import { fs, log, types } from "@nexusmods/vortex-api";
+import { fs, log, types, util } from "@nexusmods/vortex-api";
 import Bluebird from "bluebird";
 import * as winapi from "winapi-bindings";
 
+import { discoverLinuxGogGames, resolveLinuxLaunchPath } from "./linuxDiscovery";
+
 const STORE_ID = "gog";
 const STORE_NAME = "GOG";
-// no DRM, does it get better than this?
 const STORE_PRIORITY = 15;
 
 const GOG_EXEC = "GalaxyClient.exe";
 
 const REG_GOG_GAMES = "SOFTWARE\\WOW6432Node\\GOG.com\\Games";
+
+class GoGLauncherLinux implements types.IGameStore {
+  public id: string = STORE_ID;
+  public name: string = STORE_NAME;
+  public priority: number = STORE_PRIORITY;
+  private mHome: string;
+  private mCache: Bluebird<types.IGameStoreEntry[]>;
+
+  constructor(home: string) {
+    this.mHome = home;
+  }
+
+  public findByName(namePattern: string): Bluebird<types.IGameStoreEntry> {
+    const re = new RegExp("^" + namePattern + "$");
+    return this.allGames()
+      .then((entries) => entries.find((entry) => re.test(entry.name)))
+      .then((entry) => {
+        if (entry === undefined) {
+          return Bluebird.reject(new types.GameEntryNotFound(namePattern, STORE_ID));
+        }
+        return Bluebird.resolve(entry);
+      });
+  }
+
+  public launchGame(appInfo: any, api?: types.IExtensionApi): Bluebird<void> {
+    return this.getExecInfo(appInfo).then((execInfo) =>
+      api.runExecutable(execInfo.execPath, execInfo.arguments, {
+        cwd: path.dirname(execInfo.execPath),
+        suggestDeploy: true,
+        shell: true,
+      }),
+    );
+  }
+
+  public getExecInfo(appId: string): Bluebird<types.IExecInfo> {
+    return this.allGames().then((entries) => {
+      const gameEntry = entries.find((entry) => entry.appid === appId);
+      if (gameEntry === undefined) {
+        return Bluebird.reject(new types.GameEntryNotFound(appId, STORE_ID));
+      }
+
+      return Bluebird.resolve(resolveLinuxLaunchPath(gameEntry.gamePath)).then((launchPath) => {
+        if (launchPath === undefined) {
+          return Bluebird.reject(
+            new Error(`Could not resolve a launch executable for GOG game ${appId}`),
+          );
+        }
+
+        return {
+          execPath: launchPath,
+          arguments: [],
+        };
+      });
+    });
+  }
+
+  public findByAppId(appId: string | string[]): Bluebird<types.IGameStoreEntry> {
+    const matcher = Array.isArray(appId)
+      ? (entry: types.IGameStoreEntry) => appId.includes(entry.appid)
+      : (entry: types.IGameStoreEntry) => appId === entry.appid;
+
+    return this.allGames().then((entries) => {
+      const gameEntry = entries.find(matcher);
+      if (gameEntry === undefined) {
+        return Bluebird.reject(
+          new types.GameEntryNotFound(Array.isArray(appId) ? appId.join(", ") : appId, STORE_ID),
+        );
+      }
+      return Bluebird.resolve(gameEntry);
+    });
+  }
+
+  public allGames(): Bluebird<types.IGameStoreEntry[]> {
+    if (!this.mCache) {
+      this.mCache = this.getGameEntries();
+    }
+    return this.mCache;
+  }
+
+  public reloadGames(): Bluebird<void> {
+    return new Bluebird((resolve) => {
+      this.mCache = this.getGameEntries();
+      resolve();
+    });
+  }
+
+  public getGameStorePath(): Bluebird<string> {
+    return Bluebird.resolve(undefined);
+  }
+
+  public identifyGame(
+    gamePath: string,
+    fallback: (gamePath: string) => PromiseLike<boolean>,
+  ): Bluebird<boolean> {
+    return Bluebird.resolve(
+      fs
+        .readdirAsync(gamePath)
+        .then((entries) =>
+          entries.some((entry) => entry.startsWith("goggame-") && entry.endsWith(".info")),
+        )
+        .catch(() => false),
+    ).then((custom) =>
+      Bluebird.resolve(fallback(gamePath)).then((fallbackResult) => {
+        if (custom !== fallbackResult) {
+          log("warn", "(gog) game identification inconclusive", {
+            gamePath,
+            custom,
+            fallback: fallbackResult,
+          });
+        }
+        return custom || fallbackResult;
+      }),
+    );
+  }
+
+  private getGameEntries(): Bluebird<types.IGameStoreEntry[]> {
+    return Bluebird.resolve(discoverLinuxGogGames(this.mHome)).catch((err) => {
+      log("error", "gamestore-gog: failed to discover linux gog games", err);
+      return [];
+    });
+  }
+}
 
 /**
  * base class to interact with local GoG Galaxy client
@@ -26,7 +149,6 @@ class GoGLauncher implements types.IGameStore {
 
   constructor() {
     if (process.platform === "win32") {
-      // No Windows, no gog launcher!
       try {
         const gogPath = winapi.RegGetValue(
           "HKEY_LOCAL_MACHINE",
@@ -139,15 +261,15 @@ class GoGLauncher implements types.IGameStore {
     fallback: (gamePath: string) => PromiseLike<boolean>,
   ): Bluebird<boolean> {
     return Bluebird.all([this.fileExists(path.join(gamePath, "gog.ico")), fallback(gamePath)]).then(
-      ([custom, fallback]) => {
-        if (custom !== fallback) {
+      ([custom, fallbackResult]) => {
+        if (custom !== fallbackResult) {
           log("warn", "(gog) game identification inconclusive", {
             gamePath,
             custom,
-            fallback,
+            fallback: fallbackResult,
           });
         }
-        return custom || fallback;
+        return custom || fallbackResult;
       },
     );
   }
@@ -177,7 +299,6 @@ class GoGLauncher implements types.IGameStore {
                     return gameEntry;
                   } catch (err) {
                     log("error", "gamestore-gog: failed to create game entry", err);
-                    // Don't stop, keep going.
                     return undefined;
                   }
                 })
@@ -192,8 +313,20 @@ class GoGLauncher implements types.IGameStore {
   }
 }
 
+function createGameStore(context: types.IExtensionContext): types.IGameStore | undefined {
+  if (process.platform === "win32") {
+    return new GoGLauncher();
+  }
+
+  if (process.platform === "linux") {
+    return new GoGLauncherLinux(util.getVortexPath("home"));
+  }
+
+  return undefined;
+}
+
 function main(context: types.IExtensionContext) {
-  const instance: types.IGameStore = process.platform === "win32" ? new GoGLauncher() : undefined;
+  const instance = createGameStore(context);
 
   if (instance !== undefined) {
     context.registerGameStore(instance);

@@ -6,6 +6,12 @@ import Bluebird from "bluebird";
 
 import type { ITestResult, IExtensionApi, IExtensionContext } from "../../types/api";
 import { getVortexPath, UserCanceled } from "../../util/api";
+import {
+  getLinuxDotNetInstallHint,
+  hasMinimumRuntime,
+  listRuntimesViaCli,
+  resolveDotNetProbeEnv,
+} from "../../util/linux/dotnetRuntime";
 import { log } from "../../util/log";
 import { delayed, toPromise } from "../../util/util";
 import { downloadPathForGame } from "../download_management/selectors";
@@ -160,39 +166,61 @@ const installDotNet = async (
   }
 };
 
-function execFileWrapper(
+function buildLinuxDotNetResult(
+  dotnetVersion: number,
+  stderr: string,
+  severity: "error" | "fatal",
+): ITestResult {
+  return {
+    description: {
+      short: `Microsoft .NET Desktop Runtime ${dotnetVersion} required`,
+      long:
+        `Vortex requires .NET Desktop Runtime ${dotnetVersion} to be installed to run FOMOD mod installers.` +
+        "[br][/br][br][/br]" +
+        "You can continue using Vortex without .NET, but FOMOD installers will not work until it is installed." +
+        "[br][/br][br][/br]" +
+        getLinuxDotNetInstallHint() +
+        "[br][/br][br][/br]" +
+        `If you already have .NET Desktop Runtime ${dotnetVersion} installed then there may be a problem with your installation and a reinstall might be needed.` +
+        "[br][/br][br][/br]" +
+        '[spoiler label="Show detailed error"]{{stderr}}[/spoiler]',
+      replace: { stderr: stderr.replace(/\n/g, "[br][/br]") },
+    },
+    severity,
+  };
+}
+
+async function execFileWrapper(
   file: string,
   args: string[] = [],
+  env: NodeJS.ProcessEnv = process.env,
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-  return new Promise((resolve, reject) => {
-    const child = execFile(file, args);
-
-    let stdout = "";
-    let stderr = "";
-
-    child.stdout?.on("data", (data) => {
-      stdout += data.toString();
-    });
-
-    child.stderr?.on("data", (data) => {
-      stderr += data.toString();
-    });
-
-    child.on("error", (err) => {
-      reject(err);
-    });
-
-    child.on("close", (exitCode) => {
-      resolve({
-        stdout: stdout,
-        stderr: stderr,
-        exitCode: exitCode ?? 0,
-      });
-    });
-  });
+  try {
+    const { stdout, stderr } = await promisify(execFile)(file, args, { env });
+    return {
+      stdout: stdout?.toString() ?? "",
+      stderr: stderr?.toString() ?? "",
+      exitCode: 0,
+    };
+  } catch (err: any) {
+    return {
+      stdout: err.stdout?.toString() ?? "",
+      stderr: err.stderr?.toString() ?? err.message ?? "",
+      exitCode: typeof err.code === "number" ? err.code : 1,
+    };
+  }
 }
 
 async function checkNetInstall(api: IExtensionApi, dotnetVersion: number): Promise<ITestResult> {
+  if (process.platform === "linux") {
+    const home = getVortexPath("home");
+    const runtimeList = await listRuntimesViaCli(home);
+    if (runtimeList !== undefined && hasMinimumRuntime(runtimeList, dotnetVersion)) {
+      onDotNetSuccess();
+      return undefined!;
+    }
+  }
+
   let probeExecutable: string;
 
   if (process.platform === "win32") {
@@ -207,38 +235,20 @@ async function checkNetInstall(api: IExtensionApi, dotnetVersion: number): Promi
     return undefined!;
   }
 
-  let stderr: string;
-  let exitCode: number;
+  const probeEnv =
+    process.platform === "linux" ? resolveDotNetProbeEnv(getVortexPath("home")) : process.env;
 
-  try {
-    const result = await execFileWrapper(probeExecutable, [dotnetVersion.toString()]);
-    stderr = result.stderr;
-    exitCode = result.exitCode;
-  } catch (e) {
-    onDotNetFailure(e);
-    return undefined!;
-  }
+  const probeResult = await execFileWrapper(probeExecutable, [dotnetVersion.toString()], probeEnv);
+  const stderr = probeResult.stderr;
 
-  if (exitCode === 0) {
-    // .NET is already installed
+  if (probeResult.exitCode === 0) {
     onDotNetSuccess();
     return undefined!;
   }
 
   if (process.platform === "linux") {
-    return {
-      description: {
-        short: `Microsoft .NET Desktop Runtime ${dotnetVersion} required`,
-        long:
-          `Vortex requires .NET Desktop Runtime ${dotnetVersion} to be installed to run FOMOD mod installers.` +
-          "[br][/br][br][/br]" +
-          `If you already have .NET Desktop Runtime ${dotnetVersion} installed then there may be a problem with your installation and a reinstall might be needed.` +
-          "[br][/br][br][/br]" +
-          '[spoiler label="Show detailed error"]{{stderr}}[/spoiler]',
-        replace: { stderr: stderr.replace(/\n/g, "[br][/br]") },
-      },
-      severity: "fatal",
-    };
+    onDotNetFailure(new Error(stderr || "Missing .NET runtime"));
+    return buildLinuxDotNetResult(dotnetVersion, stderr, "error");
   }
 
   const result: ITestResult = {

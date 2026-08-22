@@ -179,6 +179,11 @@ runs:
           ls -la ./dist/ || true
           exit 1
         fi
+        if [[ ! -f ./dist/linux-unpacked/resources/app.asar.unpacked/assets/dotnetprobe ]]; then
+          echo "dotnetprobe binary missing from linux-unpacked assets" >&2
+          ls -la ./dist/linux-unpacked/resources/app.asar.unpacked/assets/ 2>/dev/null || true
+          exit 1
+        fi
         if [[ ! -d ./dist/linux-unpacked ]]; then
           echo "linux-unpacked directory not found in ./dist/" >&2
           ls -la ./dist/ || true
