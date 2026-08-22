@@ -79,9 +79,24 @@ jobs:
       contents: write
       pull-requests: write
     steps:
+      # Do not put secrets.* in step `if:` - GitHub can reject the workflow at
+      # start (empty job list). Probe via env instead, then gate the app token.
+      - name: Probe GitHub App credentials
+        id: creds
+        env:
+          APP_ID: ${{ secrets.APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -n "${APP_ID:-}" ] && [ -n "${APP_PRIVATE_KEY:-}" ]; then
+            echo "available=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "available=false" >> "${GITHUB_OUTPUT}"
+          fi
+
       - name: Generate GitHub App token
         id: app-token
-        if: ${{ secrets.APP_ID != '' && secrets.APP_PRIVATE_KEY != '' }}
+        if: ${{ steps.creds.outputs.available == 'true' }}
         uses: actions/create-github-app-token@v3
         with:
           # v3 prefers client-id; APP_ID may hold either app id or client id.
@@ -94,9 +109,10 @@ jobs:
           APP_TOKEN: ${{ steps.app-token.outputs.token }}
           APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
           FALLBACK_TOKEN: ${{ github.token }}
+          CREDS_AVAILABLE: ${{ steps.creds.outputs.available }}
         run: |
           set -euo pipefail
-          if [ -n "${APP_TOKEN:-}" ]; then
+          if [ "${CREDS_AVAILABLE}" = "true" ] && [ -n "${APP_TOKEN:-}" ]; then
             {
               echo "token=${APP_TOKEN}"
               echo "app_slug=${APP_SLUG}"
