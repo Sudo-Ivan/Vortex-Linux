@@ -30,6 +30,10 @@ const LINUX_EXTRA_RESOURCES = [
     from: LINUX_DOTNET_RUNTIME_DIR,
     to: "dotnet",
   },
+  {
+    from: "./build/icons",
+    to: "icons",
+  },
 ];
 
 async function resolveDepVersions(deps, nodeModulesDir) {
