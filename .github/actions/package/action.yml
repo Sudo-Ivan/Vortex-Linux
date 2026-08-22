@@ -99,6 +99,24 @@ runs:
       shell: pwsh
       run: pnpm -F "@vortex/main" -F "@nexusmods/vortex-api" version ${{ steps.setOutputs.outputs.rawVersion }} --no-git-tag-version --no-git-checks --allow-same-version
 
+    - name: Cache Nx
+      uses: actions/cache@v6
+      with:
+        path: .nx/cache
+        key: nx-package-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'nx.json', 'rolldown.base.mjs', '**/project.json') }}
+        restore-keys: |
+          nx-package-${{ runner.os }}-${{ runner.arch }}-
+
+    - name: Cache Electron downloads
+      uses: actions/cache@v6
+      with:
+        path: |
+          ~/.cache/electron
+          ~/.cache/electron-builder
+        key: electron-download-package-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'src/main/package.json') }}
+        restore-keys: |
+          electron-download-package-${{ runner.os }}-${{ runner.arch }}-
+
     - name: Install dependencies
       shell: pwsh
       run: pnpm install --frozen-lockfile
@@ -106,12 +124,14 @@ runs:
         VORTEX_ELECTRON_REBUILD: "defer"
 
     - name: Cache Electron native build headers
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: |
           ~/.electron-gyp
           ~/.cache/node-gyp
         key: package-native-headers-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package.json', 'pnpm-lock.yaml', 'src/main/package.json') }}
+        restore-keys: |
+          package-native-headers-${{ runner.os }}-${{ runner.arch }}-
 
     - name: Build workspace
       shell: pwsh
@@ -128,7 +148,7 @@ runs:
 
     - name: Cache packaged Electron native rebuild outputs
       id: packaged-native-cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: |
           src/main/dist/node_modules/@nexusmods/fomod-installer-native/build
@@ -144,6 +164,8 @@ runs:
           src/main/dist/node_modules/@parcel/watcher/build
           src/main/dist/node_modules/@parcel/watcher/bin
         key: package-dist-electron-native-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', 'src/main/package.json', 'src/main/postinstall.mjs') }}
+        restore-keys: |
+          package-dist-electron-native-${{ runner.os }}-${{ runner.arch }}-
 
     - name: Rebuild packaged Electron native modules
       if: steps.packaged-native-cache.outputs.cache-hit != 'true' # skip when cached

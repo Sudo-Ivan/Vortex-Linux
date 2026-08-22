@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { createWriteStream } from "node:fs";
+import { createWriteStream, existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { Readable } from "node:stream";
@@ -75,6 +75,10 @@ async function prepareWin() {
 
 async function prepareLinux() {
   const installDir = resolve(MAIN_DIR, "temp/dotnet-runtime");
+  const dotnetBin = resolve(installDir, "dotnet");
+  if (existsSync(dotnetBin)) {
+    return;
+  }
   await mkdir(installDir, { recursive: true });
   execSync(
     `curl -fsSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --runtime dotnet --channel 9.0 --install-dir "${installDir}"`,

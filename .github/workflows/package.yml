@@ -33,6 +33,10 @@ on:
         type: boolean
         default: true
 
+concurrency:
+  group: package-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: windows-latest
