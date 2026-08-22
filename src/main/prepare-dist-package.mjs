@@ -8,6 +8,21 @@ const MAIN_DIR = resolve(import.meta.dirname);
 const MAIN_PACKAGE_PATH = resolve(MAIN_DIR, "package.json");
 const DIST_DIR = resolve(MAIN_DIR, "build");
 const DIST_PACKAGE_PATH = resolve(DIST_DIR, "package.json");
+const ELECTRON_BUILDER_CONFIG_PATH = resolve(MAIN_DIR, "electron-builder.config.json");
+
+const LOCALES_RESOURCE = {
+  from: "../../../locales",
+  to: "locales",
+};
+
+const WIN_EXTRA_RESOURCES = [
+  "./temp/VC_redist.x64.exe",
+  "./temp/windowsdesktop-runtime-win-x64.exe",
+  "./nsis/**/*",
+  LOCALES_RESOURCE,
+];
+
+const LINUX_EXTRA_RESOURCES = [LOCALES_RESOURCE];
 
 async function resolveDepVersions(deps, nodeModulesDir) {
   if (!deps) return deps;
@@ -46,6 +61,19 @@ async function prepareWin() {
   );
 }
 
+async function patchElectronBuilderConfig() {
+  const raw = await readFile(ELECTRON_BUILDER_CONFIG_PATH, "utf8");
+  const config = JSON.parse(raw);
+
+  if (process.platform === "win32") {
+    config.extraResources = WIN_EXTRA_RESOURCES;
+  } else {
+    config.extraResources = LINUX_EXTRA_RESOURCES;
+  }
+
+  await writeFile(ELECTRON_BUILDER_CONFIG_PATH, JSON.stringify(config, null, 2) + "\n", "utf8");
+}
+
 async function main() {
   const json = await readFile(MAIN_PACKAGE_PATH, "utf8");
   const mainPkg = JSON.parse(json);
@@ -59,6 +87,8 @@ async function main() {
   mainPkg.devDependencies = await resolveDepVersions(mainPkg.devDependencies, nodeModulesDir);
 
   await writeFile(DIST_PACKAGE_PATH, JSON.stringify(mainPkg, null, 2) + "\n", "utf8");
+
+  await patchElectronBuilderConfig();
 
   if (process.platform === "win32") {
     await prepareWin();

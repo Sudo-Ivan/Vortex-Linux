@@ -98,6 +98,10 @@ temp/
 .flatpak-builder/
 flatpak/.venv-flatpak/
 flatpak/flatpak-repo/
+flatpak/prebuilt/
+flatpak/.flatpak-build-prebuilt/
+flatpak/.flatpak-repo-prebuilt/
+flatpak/.flatpak-builder-prebuilt/
 
 flatpak/scripts/__pycache__/
 

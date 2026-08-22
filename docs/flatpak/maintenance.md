@@ -2,12 +2,30 @@
 
 How to build and update the Flatpak package.
 
+## Recommended release path (prebuilt)
+
+For this Vortex-Linux fork, assemble Flatpak from a prebuilt
+`linux-unpacked` tree. That is what CI uses and what you should use for
+local release bundles:
+
+```bash
+pnpm run package:linux
+python3 flatpak/scripts/flatpak_bundle_prebuilt.py \
+  --prebuilt dist/linux-unpacked \
+  --version <version> \
+  --output dist/vortex-<version>.flatpak
+```
+
+Manifest: `flatpak/com.nexusmods.vortex.prebuilt.yaml`
+
 > [!WARNING]
 >
-> ## IMPORTANT: PNPM LOCKFILES ARE NOT SUPPORTED IN FLATPAK-BUILDER-TOOLS YET
+> ## Full-source Flatpak still depends on yarn-era scripts
 >
-> Flatpak dependency source generation still relies on compatibility lockfiles
-> such as npm and Yarn, not `pnpm-lock.yaml`.
+> Offline Flatpak source generation for the monorepo is fragile with pnpm
+> (git deps, native rebuilds, store layout). Prefer the prebuilt path above.
+> The yarn-based `flatpak/com.nexusmods.vortex.yaml` path remains for
+> experiments only.
 >
 > - [Flatpak Builder Tools PR 511]
 > - [Flatpak Builder Tools issue 383]
@@ -24,13 +42,17 @@ virtual environment and can run from any directory.
 > [!tip]
 > Use `python` instead if `python3` does not work on your system.
 
-### Development Workflow
+### Prebuilt release workflow
+
+- `flatpak_bundle_prebuilt.py`: build a `.flatpak` bundle from `linux-unpacked`
+
+### Full-source development workflow (secondary)
 
 - `flatpak_build.py`: build the Flatpak with standard defaults
 - `flatpak_run.py`: run the installed Flatpak, building and installing first
   if needed
 
-### Distribution And UX Testing Workflow
+### Distribution And UX Testing Workflow (full-source)
 
 - `flatpak_install.py`: export to a local repo and install the app so it
   appears in KDE Discover and similar software centers

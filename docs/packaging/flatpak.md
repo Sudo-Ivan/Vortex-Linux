@@ -2,9 +2,24 @@
 
 Use this page when you need to build, install, or bundle the Flatpak package.
 
-> [!WARNING]
-> Flatpak is broken right now.
-> `pnpm` support in Flatpak still needs fixing.
+## Recommended: prebuilt assembly (Vortex-Linux)
+
+This fork's supported Flatpak path packages an already-built
+`linux-unpacked` tree from `pnpm run package:linux` (or the Linux package CI job).
+That avoids offline yarn/pnpm source generation inside Flatpak.
+
+```bash
+# After package:linux has produced dist/linux-unpacked
+python3 flatpak/scripts/flatpak_bundle_prebuilt.py \
+  --prebuilt dist/linux-unpacked \
+  --version 2.x.y \
+  --output dist/vortex-2.x.y.flatpak
+```
+
+CI: `.github/workflows/package-linux.yml` can build zip + AppImage, then assemble
+the Flatpak bundle from the uploaded `linux-unpacked` artifact.
+
+Manifest: `flatpak/com.nexusmods.vortex.prebuilt.yaml`
 
 ## Flatpak Basics (Linux Packaging)
 
@@ -26,22 +41,25 @@ These dependencies are only required if you are building the Flatpak package.
 > [!note]
 > There is an additional Python-based dependency,
 > `flatpak-node-generator`, but the scripts in `flatpak/scripts/`
-> automatically install it for you. The Flathub remote is also added
-> automatically if missing.
+> automatically install it for you when using the full-source path.
+> The Flathub remote is also added automatically if missing.
 
-## First-Time Setup
+## Full-source Flatpak (secondary)
 
-Make sure submodules are available before the first Flatpak build:
+> [!WARNING]
+> The full-source Flatpak path (`flatpak/com.nexusmods.vortex.yaml`) still
+> expects yarn-era install/build scripts and is not the release path for this
+> fork. Prefer the prebuilt assembly above.
+
+### First-Time Setup
+
+Make sure submodules are available before a full-source Flatpak build:
 
 ```bash
 git submodule update --init --recursive
 ```
 
-## Common Workflows
-
 ### Quick Development Test
-
-Build the Flatpak with the standard defaults, then run the installed app:
 
 ```bash
 python3 flatpak/scripts/flatpak_build.py
@@ -50,31 +68,14 @@ python3 flatpak/scripts/flatpak_run.py
 
 ### Install Into A Local Repo
 
-This builds and installs the app so it appears in software centers such as
-KDE Discover or GNOME Software:
-
 ```bash
 python3 flatpak/scripts/flatpak_install.py
 ```
 
-If you already built with `flatpak_build.py`, you can skip the rebuild:
-
-```bash
-python3 flatpak/scripts/flatpak_install.py --skip-build
-```
-
-### Create A Bundle
-
-This builds the package and creates a `.flatpak` bundle for distribution:
+### Create A Bundle (full-source)
 
 ```bash
 python3 flatpak/scripts/flatpak_bundle.py
-```
-
-If you already built with `flatpak_build.py`, you can skip the rebuild:
-
-```bash
-python3 flatpak/scripts/flatpak_bundle.py --skip-build
 ```
 
 ## Further Reading

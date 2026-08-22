@@ -2,7 +2,7 @@
   <img src=".github/assets/github_readme_title.png" alt="Vortex Mod Manager title banner"/>
 </p>
 
-<p align="center">  
+<p align="center">
 <a href="https://discord.gg/nexusmods"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
 <a href="https://twitter.com/nexussites"><img src="https://img.shields.io/badge/twitter-000000?style=for-the-badge&logo=x&logoColor=white" alt="X (formally Twitter)"></a>
 <a href="https://www.youtube.com/c/NexusModsYT"><img src="https://img.shields.io/badge/YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="YouTube"></a>
@@ -31,16 +31,73 @@ Our approach with Vortex aims to take complex tasks such as sorting your load or
 
 - **Extensions and Plugins** - Vortex is released under a GPL-3.0 License, giving our community the ability to write extensions and frameworks which can then interact with Vortex, continually adding to its functionality.
 
-## Getting Started
+## Getting Started (this fork)
 
-To get started, Vortex can be downloaded from [Nexus Mods](https://www.nexusmods.com/site/mods/1?tab=files) or from [GitHub](https://github.com/Nexus-Mods/Vortex/releases/latest). After the installer has been downloaded, just run it and follow the instructions.
+This repository is **[Sudo-Ivan/Vortex-Linux](https://github.com/Sudo-Ivan/Vortex-Linux)**, a Linux-oriented fork of upstream [Nexus-Mods/Vortex](https://github.com/Nexus-Mods/Vortex).
 
-Additional information on Vortex and guides can be found in the [Vortex Wiki](https://github.com/Nexus-Mods/Vortex/wiki).
+### Linux packages
+
+GitHub Actions workflow **Package Linux** (`.github/workflows/package-linux.yml`) builds:
+
+- Portable `.zip`
+- `.AppImage`
+- Optional `.flatpak` bundle (assembled from the prebuilt `linux-unpacked` tree)
+
+Artifacts appear on [Releases](https://github.com/Sudo-Ivan/Vortex-Linux/releases) when a draft release is requested, or as workflow artifacts.
+
+### Build and run on Linux
+
+```bash
+pnpm install
+pnpm run build
+pnpm run start
+```
+
+Package zip + AppImage locally:
+
+```bash
+pnpm run package:linux
+```
+
+Flatpak from that build:
+
+```bash
+python3 flatpak/scripts/flatpak_bundle_prebuilt.py \
+  --prebuilt dist/linux-unpacked \
+  --version <version> \
+  --output dist/vortex-<version>.flatpak
+```
+
+See [CONTRIBUTE.md](CONTRIBUTE.md) and [docs/packaging/flatpak.md](docs/packaging/flatpak.md).
+
+### Upstream Windows builds
+
+Official Windows installers remain available from [Nexus Mods](https://www.nexusmods.com/site/mods/1?tab=files) and [upstream GitHub releases](https://github.com/Nexus-Mods/Vortex/releases/latest).
+
+## Upstream sync
+
+Keep this fork easy to merge with Nexus-Mods/Vortex:
+
+```bash
+git remote add upstream https://github.com/Nexus-Mods/Vortex.git
+git fetch upstream
+git merge upstream/master
+```
+
+After a merge, re-check fork-owned paths:
+
+- `.github/workflows/package-linux.yml`
+- `.github/actions/package-linux/`
+- `package:linux` scripts in root and `src/main/package.json`
+- `src/main/electron-builder.config.json` Linux section / `extraResources` handling
+- `src/main/prepare-dist-package.mjs` platform `extraResources` patch
+- `flatpak/com.nexusmods.vortex.prebuilt.yaml` and `flatpak/scripts/flatpak_bundle_prebuilt.py`
 
 ## Resources
 
-- [Download Vortex](https://www.nexusmods.com/site/mods/1?tab=files) from Nexus Mods
-- [GitHub](https://github.com/Nexus-Mods/Vortex) for source code, issues, and pull requests.
+- [This fork](https://github.com/Sudo-Ivan/Vortex-Linux) for Linux packages and Linux-focused issues
+- [Upstream Vortex](https://github.com/Nexus-Mods/Vortex) for source history and Windows releases
+- [Download Vortex (Windows)](https://www.nexusmods.com/site/mods/1?tab=files) from Nexus Mods
 - [Vortex Forum](https://forums.nexusmods.com/index.php?/forum/4306-vortex-support/) or [Discord](https://discord.gg/nexusmods) for support and discussions with the community and the team.
 - [Vortex Wiki](https://github.com/Nexus-Mods/Vortex/wiki) for knowledge base, articles and troubleshooting
 
