@@ -42,7 +42,7 @@ class GoGLauncherLinux implements types.IGameStore {
       api.runExecutable(execInfo.execPath, execInfo.arguments, {
         cwd: path.dirname(execInfo.execPath),
         suggestDeploy: true,
-        shell: true,
+        shell: false,
       }),
     );
   }

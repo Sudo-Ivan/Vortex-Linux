@@ -185,6 +185,29 @@ async function getHeroicDefaultInstallPath(home: string): Promise<string | undef
   return undefined;
 }
 
+export function resolveLaunchPathWithinGame(
+  gameRoot: string,
+  launchPath: string,
+): string | undefined {
+  if (launchPath.length === 0) {
+    return undefined;
+  }
+
+  if (path.isAbsolute(launchPath)) {
+    return undefined;
+  }
+
+  const resolvedRoot = path.resolve(gameRoot);
+  const resolvedLaunch = path.resolve(resolvedRoot, launchPath);
+  const rootPrefix = resolvedRoot.endsWith(path.sep) ? resolvedRoot : resolvedRoot + path.sep;
+
+  if (resolvedLaunch !== resolvedRoot && !resolvedLaunch.startsWith(rootPrefix)) {
+    return undefined;
+  }
+
+  return resolvedLaunch;
+}
+
 function dedupeEntries(entries: types.IGameStoreEntry[]): types.IGameStoreEntry[] {
   const byAppId = new Map<string, types.IGameStoreEntry>();
   for (const entry of entries) {
@@ -231,5 +254,5 @@ export async function resolveLinuxLaunchPath(gamePath: string): Promise<string |
   }
 
   const resolvedGamePath = await resolveGamePath(infoFiles[0]);
-  return path.join(resolvedGamePath, primaryTask.path);
+  return resolveLaunchPathWithinGame(resolvedGamePath, primaryTask.path);
 }

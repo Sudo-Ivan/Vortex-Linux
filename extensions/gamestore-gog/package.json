@@ -4,7 +4,8 @@
   "description": "Provides discovery and launch support for GOG games",
   "scripts": {
     "build": "node build.mjs && pnpm extractInfo",
-    "typecheck": "pnpm tsc"
+    "typecheck": "pnpm tsc",
+    "test": "vitest run --config vitest.config.ts"
   },
   "author": "Black Tree Gaming Ltd.",
   "license": "GPL-3.0",
@@ -16,6 +17,7 @@
   "devDependencies": {
     "@types/bluebird": "catalog:",
     "@types/node": "catalog:",
+    "@vortex/extension-test-mocks": "workspace:*",
     "bluebird": "catalog:",
     "copyfiles": "catalog:",
     "typescript": "catalog:",

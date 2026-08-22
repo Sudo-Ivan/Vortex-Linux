@@ -2633,6 +2633,9 @@ importers:
       '@types/node':
         specifier: 24.12.2
         version: 24.12.2
+      '@vortex/extension-test-mocks':
+        specifier: workspace:*
+        version: link:../../packages/extension-test-mocks
       bluebird:
         specifier: 'catalog:'
         version: 3.7.2
