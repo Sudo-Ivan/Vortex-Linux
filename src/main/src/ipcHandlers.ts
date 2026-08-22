@@ -35,6 +35,7 @@ import { relaunch } from "./cli";
 import { getVortexPath } from "./getVortexPath";
 import { hashFile } from "./hash/host";
 import { betterIpcMain } from "./ipc";
+import { initLinuxIpc } from "./linux/ipc";
 import { openUrl, openFile } from "./open";
 import { extraWebViews } from "./webview";
 
@@ -654,4 +655,6 @@ export function init() {
     (_event: IpcMainInvokeEvent, algorithm: HashAlgorithm, filePath: string) =>
       hashFile(algorithm, filePath),
   );
+
+  initLinuxIpc();
 }

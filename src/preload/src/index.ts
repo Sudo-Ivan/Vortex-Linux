@@ -126,6 +126,11 @@ try {
       restartAndInstall: () => betterIpcRenderer.send("updater:restart-and-install"),
     },
 
+    linux: {
+      getSystemHealth: () => betterIpcRenderer.invoke("linux:get-system-health"),
+      repairDesktopIntegration: () => betterIpcRenderer.invoke("linux:repair-desktop-integration"),
+    },
+
     dialog: {
       showOpen: (options) => betterIpcRenderer.invoke("dialog:showOpen", options),
       showSave: (options) => betterIpcRenderer.invoke("dialog:showSave", options),

@@ -22,6 +22,8 @@ import type {
   DiffOperation,
   AppInitMetadata,
   HashAlgorithm,
+  LinuxDesktopRepairResult,
+  LinuxSystemHealthReport,
   Serializable,
   UpdateStatus,
   VortexPaths,
@@ -65,6 +67,9 @@ export interface Api {
 
   /** Updater API - for querying update status from main process */
   updater: UpdaterApi;
+
+  /** Linux integration health API */
+  linux: LinuxApi;
   /** Dialog APIs */
   dialog: Dialog;
 
@@ -476,6 +481,12 @@ export interface UpdaterApi {
    * Trigger restart and install of the downloaded update.
    */
   restartAndInstall(): void;
+}
+
+/** API for Linux integration health checks */
+export interface LinuxApi {
+  getSystemHealth(): Promise<LinuxSystemHealthReport>;
+  repairDesktopIntegration(): Promise<LinuxDesktopRepairResult>;
 }
 
 /** API for interacting with the DownloadManager in main */

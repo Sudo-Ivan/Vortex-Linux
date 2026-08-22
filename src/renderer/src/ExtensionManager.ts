@@ -3051,6 +3051,7 @@ class ExtensionManager {
       installer_fomod_shared: () => require("./extensions/installer_fomod_shared/index.ts"),
       installer_nested_fomod: () => require("./extensions/installer_nested_fomod/index.ts"),
       instructions_overlay: () => require("./extensions/instructions_overlay/index.ts"),
+      linux_system: () => require("./extensions/linux_system/index.ts"),
       mod_load_order: () => require("./extensions/mod_load_order/index.ts"),
       mod_management: () => require("./extensions/mod_management/index.ts"),
       move_activator: () => require("./extensions/move_activator/index.ts"),

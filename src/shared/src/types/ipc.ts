@@ -67,6 +67,28 @@ export interface UpdateStatus {
   error?: string;
 }
 
+export type LinuxHealthStatus = "ok" | "warning" | "error" | "info" | "skipped";
+
+export interface LinuxHealthCheck {
+  id: string;
+  status: LinuxHealthStatus;
+  summary: string;
+  detail?: string;
+  repairable?: boolean;
+}
+
+export interface LinuxSystemHealthReport {
+  platform: "linux";
+  isFlatpak: boolean;
+  isDevelopment: boolean;
+  checks: LinuxHealthCheck[];
+}
+
+export interface LinuxDesktopRepairResult {
+  repaired: boolean;
+  reason?: string;
+}
+
 /** Vortex application paths */
 export type VortexPaths = {
   base: string;
@@ -343,6 +365,10 @@ export interface InvokeChannels {
 
   // Updater: Query current update status from main process
   "updater:get-status": () => Promise<UpdateStatus>;
+
+  // Linux: Query system integration health and repair desktop files
+  "linux:get-system-health": () => Promise<LinuxSystemHealthReport>;
+  "linux:repair-desktop-integration": () => Promise<LinuxDesktopRepairResult>;
   // Dialog channels
   "dialog:showOpen": (options: OpenDialogOptions) => Promise<OpenDialogReturnValue>;
   "dialog:showSave": (options: SaveDialogOptions) => Promise<SaveDialogReturnValue>;
