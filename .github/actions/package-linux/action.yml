@@ -157,6 +157,9 @@ runs:
 
     - name: Build Linux packages
       shell: bash
+      env:
+        # electron-builder hardlinks can EEXIST when the same .node is unpacked twice
+        USE_HARD_LINKS: "false"
       run: pnpm -F @vortex/main run package:linux
 
     - name: Validate Package Creation
