@@ -19,7 +19,7 @@ if (process.send) {
 }
 
 import child_process from "node:child_process";
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import os from "os";
@@ -120,6 +120,19 @@ function setEnv(key: string, value: string, force?: boolean) {
 
 if (process.env.NODE_ENV !== "development") {
   setEnv("NODE_ENV", "production", true);
+}
+
+if (process.platform === "linux" && process.env.NODE_ENV === "production") {
+  const bundledDotnet = path.join(process.resourcesPath, "dotnet");
+  const bundledDotnetHost = path.join(bundledDotnet, "dotnet");
+  if (existsSync(bundledDotnetHost)) {
+    setEnv("DOTNET_ROOT", bundledDotnet, true);
+    setEnv("VORTEX_BUNDLED_DOTNET", "1", true);
+    const pathEntries = process.env.PATH?.split(path.delimiter) ?? [];
+    if (!pathEntries.includes(bundledDotnet)) {
+      setEnv("PATH", [bundledDotnet, ...pathEntries].join(path.delimiter), true);
+    }
+  }
 }
 
 if (process.platform === "win32" && process.env.NODE_ENV !== "development") {

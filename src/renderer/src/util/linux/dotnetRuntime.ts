@@ -5,8 +5,16 @@ import { promisify } from "util";
 
 const execFileAsync = promisify(execFile);
 
+export function getBundledDotNetRoot(): string | undefined {
+  if (process.env.VORTEX_BUNDLED_DOTNET !== "1" || process.env.DOTNET_ROOT === undefined) {
+    return undefined;
+  }
+  return process.env.DOTNET_ROOT;
+}
+
 export function getDotNetRootCandidates(home: string): string[] {
   const candidates = [
+    getBundledDotNetRoot(),
     process.env.DOTNET_ROOT,
     "/usr/share/dotnet",
     "/usr/lib/dotnet",
@@ -61,6 +69,10 @@ export function resolveDotNetProbeEnv(home: string): NodeJS.ProcessEnv {
 }
 
 export function getLinuxDotNetInstallHint(): string {
+  if (getBundledDotNetRoot() !== undefined) {
+    return "The bundled .NET runtime could not be used. Try reinstalling Vortex or report this as a packaging bug.";
+  }
+
   return (
     "Install the .NET 9 runtime using your package manager or from " +
     "https://dotnet.microsoft.com/download/dotnet/9.0" +

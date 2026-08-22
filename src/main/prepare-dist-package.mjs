@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import { createWriteStream } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -9,6 +10,7 @@ const MAIN_PACKAGE_PATH = resolve(MAIN_DIR, "package.json");
 const DIST_DIR = resolve(MAIN_DIR, "build");
 const DIST_PACKAGE_PATH = resolve(DIST_DIR, "package.json");
 const ELECTRON_BUILDER_CONFIG_PATH = resolve(MAIN_DIR, "electron-builder.config.json");
+const LINUX_DOTNET_RUNTIME_DIR = "./temp/dotnet-runtime";
 
 const LOCALES_RESOURCE = {
   from: "../../../locales",
@@ -22,7 +24,13 @@ const WIN_EXTRA_RESOURCES = [
   LOCALES_RESOURCE,
 ];
 
-const LINUX_EXTRA_RESOURCES = [LOCALES_RESOURCE];
+const LINUX_EXTRA_RESOURCES = [
+  LOCALES_RESOURCE,
+  {
+    from: LINUX_DOTNET_RUNTIME_DIR,
+    to: "dotnet",
+  },
+];
 
 async function resolveDepVersions(deps, nodeModulesDir) {
   if (!deps) return deps;
@@ -61,6 +69,15 @@ async function prepareWin() {
   );
 }
 
+async function prepareLinux() {
+  const installDir = resolve(MAIN_DIR, "temp/dotnet-runtime");
+  await mkdir(installDir, { recursive: true });
+  execSync(
+    `curl -fsSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --runtime dotnet --channel 9.0 --install-dir "${installDir}"`,
+    { stdio: "inherit", shell: true },
+  );
+}
+
 async function patchElectronBuilderConfig() {
   const raw = await readFile(ELECTRON_BUILDER_CONFIG_PATH, "utf8");
   const config = JSON.parse(raw);
@@ -92,6 +109,8 @@ async function main() {
 
   if (process.platform === "win32") {
     await prepareWin();
+  } else if (process.platform === "linux") {
+    await prepareLinux();
   }
 }
 
