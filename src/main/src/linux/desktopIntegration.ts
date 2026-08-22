@@ -171,13 +171,17 @@ function installIcons(iconSourcePath: string): boolean {
   return changed;
 }
 
+function isEnoent(error: Error | undefined): boolean {
+  return error !== undefined && "code" in error && error.code === "ENOENT";
+}
+
 function refreshDesktopDatabase(applicationsDir: string): void {
   const result = spawnSync("update-desktop-database", [applicationsDir], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
   });
 
-  if ((result.error as NodeJS.ErrnoException | undefined)?.code === "ENOENT") {
+  if (isEnoent(result.error)) {
     return;
   }
 
