@@ -8,6 +8,10 @@ name: Bundled Actions
 #
 # Each action is a package in the Vortex workspace named @vortex/<name>-action, so
 # both jobs install once at the repo root and drive the actions through nx.
+#
+# Fork note (Vortex-Linux): rebuild prefers a GitHub App token when APP_ID and
+# APP_PRIVATE_KEY are set (upstream Nexus). Otherwise it falls back to
+# GITHUB_TOKEN so pushes on this fork do not fail.
 
 on:
   push:
@@ -71,28 +75,67 @@ jobs:
     name: Rebuild Bundles
     if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Generate GitHub App token
         id: app-token
+        if: ${{ secrets.APP_ID != '' && secrets.APP_PRIVATE_KEY != '' }}
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ secrets.APP_ID }}
+          # v3 prefers client-id; APP_ID may hold either app id or client id.
+          client-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Select auth token
+        id: auth
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          FALLBACK_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ -n "${APP_TOKEN:-}" ]; then
+            {
+              echo "token=${APP_TOKEN}"
+              echo "app_slug=${APP_SLUG}"
+              echo "mode=app"
+            } >> "${GITHUB_OUTPUT}"
+          else
+            {
+              echo "token=${FALLBACK_TOKEN}"
+              echo "app_slug="
+              echo "mode=github_token"
+            } >> "${GITHUB_OUTPUT}"
+            echo "::notice::APP_ID/APP_PRIVATE_KEY not configured; using GITHUB_TOKEN for bundle rebuild."
+          fi
 
       - name: Get GitHub App User ID
         id: get-user-id
-        run: echo "user-id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+        if: ${{ steps.auth.outputs.mode == 'app' }}
+        run: echo "user-id=$(gh api "/users/${{ steps.auth.outputs.app_slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.auth.outputs.token }}
 
       - uses: actions/checkout@v7
         with:
-          token: ${{ steps.app-token.outputs.token }}
+          token: ${{ steps.auth.outputs.token }}
 
       - name: Configure Git
+        env:
+          AUTH_MODE: ${{ steps.auth.outputs.mode }}
+          APP_SLUG: ${{ steps.auth.outputs.app_slug }}
+          APP_USER_ID: ${{ steps.get-user-id.outputs.user-id }}
         run: |
-          git config user.name '${{ steps.app-token.outputs.app-slug }}[bot]'
-          git config user.email '${{ steps.get-user-id.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com'
+          set -euo pipefail
+          if [ "${AUTH_MODE}" = "app" ]; then
+            git config user.name "${APP_SLUG}[bot]"
+            git config user.email "${APP_USER_ID}+${APP_SLUG}[bot]@users.noreply.github.com"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          fi
 
       - name: Install volta, Node.js
         uses: volta-cli/action@v5
@@ -117,6 +160,6 @@ jobs:
 
       - name: Open a PR if any bundle changed
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.auth.outputs.token }}
           BASE: ${{ github.ref_name }}
         run: bash .github/scripts/rebuild-action-bundles.sh
