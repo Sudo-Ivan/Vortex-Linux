@@ -9,6 +9,7 @@ import { app, ipcMain, screen, webContents, BrowserWindow } from "electron";
 import { terminate } from "./errorHandling";
 import { reportCrash } from "./errorReporting";
 import { getVortexPath } from "./getVortexPath";
+import { ensureLinuxDesktopIntegration, resolveLinuxIconPath } from "./linux/desktopIntegration";
 import { log } from "./logging";
 import Debouncer from "./NodeDebouncer";
 import { openUrl } from "./open";
@@ -406,6 +407,7 @@ class MainWindow {
       show: false,
       title: "Vortex",
       titleBarStyle: windowMetrics?.customTitlebar === true ? "hidden" : "default",
+      ...(process.platform === "linux" ? { icon: resolveLinuxIconPath() } : undefined),
       webPreferences: {
         preload: path.join(getVortexPath("base"), "preload.cjs"),
         nodeIntegration: true, // Required for @electron/remote compatibility

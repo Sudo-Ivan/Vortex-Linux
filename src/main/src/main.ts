@@ -30,6 +30,10 @@ import i18next from "i18next";
 import * as sourceMapSupport from "source-map-support";
 import winapi from "winapi-bindings";
 
+if (process.platform === "linux") {
+  app.commandLine.appendSwitch("class", "Vortex");
+}
+
 // E2E test isolation: redirect userData and appData to temp directories so
 // parallel test workers share no data and don't conflict with the real install.
 if (process.env.VORTEX_E2E === "1") {

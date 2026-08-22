@@ -62,6 +62,12 @@ for (const file of await glob("assets/*.json", { cwd: WORKSPACE })) {
   await copy(join(WORKSPACE, file), join(ASSETS, basename(file)));
 }
 
+const vortexIcon = join(WORKSPACE, "assets/images/vortex.png");
+const iconsDir = join(BUILD, "icons");
+for (const size of [16, 24, 32, 48, 64, 128, 256, 512]) {
+  await copy(vortexIcon, join(iconsDir, `${size}x${size}.png`));
+}
+
 // Locales (dev only)
 if (process.env.NODE_ENV !== "production") {
   for (const file of await glob("locales/*/*", { cwd: WORKSPACE })) {

@@ -32,6 +32,7 @@ import { setupMainExtensions } from "./extensions";
 import { validateFiles } from "./fileValidation";
 import { getVortexPath, setVortexPath } from "./getVortexPath";
 import { shutdownHashWorker } from "./hash/host";
+import { ensureLinuxDesktopIntegration } from "./linux/desktopIntegration";
 import { log, setupLogging, changeLogPath } from "./logging";
 import MainWindow from "./MainWindow";
 import SplashScreen from "./SplashScreen";
@@ -265,6 +266,8 @@ class Application {
     });
 
     const onReady = () => {
+      ensureLinuxDesktopIntegration(process.execPath);
+
       const vortexPath = process.env.NODE_ENV === "development" ? "vortex_devel" : "vortex";
 
       // if userData specified, use it

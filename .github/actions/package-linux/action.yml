@@ -179,6 +179,11 @@ runs:
           ls -la ./dist/ || true
           exit 1
         fi
+        if [[ ! -f ./dist/linux-unpacked/resources/icons/256x256.png ]]; then
+          echo "linux app icon missing from linux-unpacked resources" >&2
+          ls -la ./dist/linux-unpacked/resources/icons/ 2>/dev/null || true
+          exit 1
+        fi
         if [[ ! -f ./dist/linux-unpacked/resources/dotnet/dotnet ]]; then
           echo "bundled dotnet runtime missing from linux-unpacked resources" >&2
           ls -la ./dist/linux-unpacked/resources/dotnet/ 2>/dev/null || true
