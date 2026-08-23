@@ -591,6 +591,12 @@ function makeDriverState(overrides: Partial<IDriverHarnessState> = {}): IState {
       // as-unknown-as-IState below covers the omitted fields)
       mods: { installPath: {} },
       profiles: { activeProfileId: undefined, nextProfileId: undefined, lastActiveProfile: {} },
+      nexus: {
+        fork: {
+          disablePremiumGates: false,
+          autoResolveDependencies: false,
+        },
+      },
     },
   } as unknown as IState;
 }

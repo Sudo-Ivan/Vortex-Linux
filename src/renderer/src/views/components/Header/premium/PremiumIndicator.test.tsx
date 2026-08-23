@@ -26,6 +26,7 @@ const signedOut = () => ({ confidential: { account: {} }, persistent: {} });
 const signedIn = (userInfo: Record<string, unknown>) => ({
   confidential: { account: { nexus: { APIKey: "an-api-key" } } },
   persistent: { nexus: { userInfo } },
+  settings: { nexus: { fork: { disablePremiumGates: false } } },
 });
 
 vi.mock("react-redux", async () => {
