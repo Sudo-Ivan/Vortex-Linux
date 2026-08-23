@@ -21,18 +21,21 @@ describe("resolveCaseAwarePath", () => {
   });
 
   it("follows the on-disk casing for each path component", async () => {
+    const root = path.join("/games", "Skyrim");
+    const dataDir = path.join(root, "Data");
+
     vi.mocked(fs.readdirAsync).mockImplementation((dir: string) => {
-      if (dir === "/games/Skyrim") {
+      if (dir === root) {
         return Promise.resolve(["Data"]) as unknown as ReturnType<typeof fs.readdirAsync>;
       }
-      if (dir === "/games/Skyrim/Data") {
+      if (dir === dataDir) {
         return Promise.resolve(["Skyrim.esm"]) as unknown as ReturnType<typeof fs.readdirAsync>;
       }
       return Promise.resolve([]) as unknown as ReturnType<typeof fs.readdirAsync>;
     });
 
-    await expect(resolveCaseAwarePath("/games/Skyrim", "data/skyrim.esm")).resolves.toBe(
-      path.join("/games/Skyrim", "Data", "Skyrim.esm"),
+    await expect(resolveCaseAwarePath(root, "data/skyrim.esm")).resolves.toBe(
+      path.join(root, "Data", "Skyrim.esm"),
     );
   });
 });
