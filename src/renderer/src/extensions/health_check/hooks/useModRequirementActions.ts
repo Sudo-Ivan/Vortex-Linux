@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 
 import { onDownloadRequirement } from "@/extensions/health_check/utils/modRequirements/onDownloadRequirement";
-import { shouldShowPremiumAd } from "@/extensions/nexus_integration/selectors";
+import { allowsInAppDownloads } from "@/extensions/nexus_integration/selectors";
 import type { IExtensionApi } from "@/types/IExtensionContext";
 import opn from "@/util/opn";
 
@@ -34,7 +34,7 @@ export function useModRequirementActions(
     [feedbackMap, mod.requiredBy.modId, mod.id],
   );
 
-  const showPremiumAd = useSelector(shouldShowPremiumAd);
+  const showPremiumAd = useSelector((state) => !allowsInAppDownloads(state));
 
   const openModPage = useCallback(() => {
     if (mod.modUrl) {

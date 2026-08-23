@@ -56,8 +56,9 @@ import type { IModListItem } from "../news_dashlet/types";
 import { setUserInfo } from "./actions/persistent";
 import { NEXUS_BASE_URL, NEXUS_GAMES_URL } from "./constants";
 import { ensureFreshMembership, refreshMembership } from "./membership";
+import { getNexusWebsiteUrl } from "./nexusFork";
 import { nxmModUrl } from "./NXMUrl";
-import { isLoggedIn, isPremium } from "./selectors";
+import { isLoggedIn, isPremium, allowsInAppDownloads } from "./selectors";
 import type { IValidateKeyDataV2 } from "./types/IValidateKeyData";
 import {
   checkModVersionsImpl,
@@ -366,11 +367,11 @@ function downloadFile(
 ): Bluebird<string> {
   const state: IState = api.getState();
   const gameId = game?.id ?? SITE_ID;
-  if (game != null && gameId !== SITE_ID && !isPremium(state)) {
+  if (game != null && gameId !== SITE_ID && !allowsInAppDownloads(state)) {
     // The cached membership is the only thing saying no, and a plan bought on the website pushes
     // nothing to Vortex - so confirm it before refusing a download the user can now make.
     return Bluebird.resolve(ensureFreshMembership(api, nexus)).then(() => {
-      if (isPremium(api.getState())) {
+      if (allowsInAppDownloads(api.getState())) {
         return downloadFile(api, nexus, game, modId, fileId, fileName, allowInstall);
       }
       // nexusmods can't let users download files directly from client, without
@@ -1186,10 +1187,12 @@ function extractLatestModInfo(state: IState, gameId: string, input: IModInfo): I
     category: resolveCategoryName(input.category_id.toString(), state),
     summary: input.summary,
     imageUrl: input.picture_url,
-    link: `${NEXUS_BASE_URL}/${input.domain_name}/mods/${input.mod_id}`,
+    link: `${getNexusWebsiteUrl()}/${input.domain_name}/mods/${input.mod_id}`,
     extra: [
       { id: "endorsements", value: input.endorsement_count },
       { id: "downloads", value: input.mod_downloads },
+      { id: "modId", value: input.mod_id },
+      { id: "domain", value: input.domain_name },
     ],
   };
 }

@@ -26,7 +26,7 @@ import { addFreeUserDLItem, removeFreeUserDLItem } from "./actions/session";
 import { NEXUS_BASE_URL } from "./constants";
 import { refreshMembership, scheduleMembershipRefresh } from "./membership";
 import NXMUrl from "./NXMUrl";
-import { isPremium, userInfo } from "./selectors";
+import { isPremium, userInfo, allowsInAppDownloads } from "./selectors";
 import { bringToFront, ensureLoggedIn, getInfoGraphQL, oauthCallback, startDownload } from "./util";
 import { findLatestUpdate } from "./util/checkModsVersion";
 import { nxmPageId } from "./util/convertGameId";
@@ -311,7 +311,7 @@ export class NxmProtocol {
     if (process.env["FORCE_FREE_DOWNLOADS"] === "yes") {
       return false;
     }
-    return isPremium(this.#api.getState());
+    return allowsInAppDownloads(this.#api.getState());
   }
 
   /** Whether the site offers an extension with this mod id. */

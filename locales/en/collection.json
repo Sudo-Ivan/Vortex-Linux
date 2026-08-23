@@ -29,6 +29,7 @@
       "endorsements": "{{total}} endorsements",
       "downloads": "{{total}} downloads",
       "viewOnSite": "View on Nexus Mods",
+      "download": "Download",
       "loginPrompt": "Log in to your Nexus Mods account to browse mods and start downloads from Vortex.",
       "login": "Log in",
       "premiumPrompt": "Premium members get faster direct downloads and one-click installs from the site.",

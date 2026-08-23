@@ -89,6 +89,7 @@ import { accountReducer } from "./reducers/account";
 import { persistentReducer } from "./reducers/persistent";
 import { sessionReducer } from "./reducers/session";
 import { settingsReducer } from "./reducers/settings";
+import { syncNexusForkFromState } from "./nexusFork";
 import * as sel from "./selectors";
 import type { INexusAPIExtension } from "./types/INexusAPIExtension";
 import type { IRemoteInfo } from "./util";
@@ -988,6 +989,8 @@ async function once(api: IExtensionApi, callbacks: Array<(nexus: NexusT) => void
     // limit lifetime of state
     const state = api.getState();
 
+    syncNexusForkFromState(state);
+
     const Nexus: typeof NexusT = require("@nexusmods/nexus-api").default;
     const apiKey = state.confidential.account?.["nexus"]?.["APIKey"];
     const oauthCred = state.confidential.account?.["nexus"]?.["OAuthCredentials"]; // get credentials from state - this only happens once when extension is loading
@@ -1124,6 +1127,13 @@ async function once(api: IExtensionApi, callbacks: Array<(nexus: NexusT) => void
   api.onStateChange(
     ["confidential", "account", "nexus", "OAuthCredentials"],
     eh.onOAuthTokenChanged(api, nexus),
+  );
+
+  api.onStateChange(
+    ["settings", "nexus", "fork"],
+    () => {
+      syncNexusForkFromState(api.getState());
+    },
   );
 
   api.onStateChange(["persistent", "mods"], eh.onChangeMods(api, nexus));
@@ -1491,6 +1501,14 @@ function init(context: IExtensionContext): boolean {
   context.registerSettings(
     "Download",
     LazyComponent(() => require("./views/Settings")),
+  );
+
+  context.registerSettings(
+    "Mod source",
+    LazyComponent(() => require("./views/NexusForkSettings")),
+    undefined,
+    undefined,
+    95,
   );
 
   const onCancelLogin = () => onCancelLoginImpl(context.api);

@@ -11,7 +11,9 @@ import { Listing } from "@/ui/components/listing/Listing";
 import { NoResults } from "@/ui/components/no_results/NoResults";
 import { Picker } from "@/ui/components/picker/Picker";
 import { Typography } from "@/ui/components/typography/Typography";
-import { isPremium } from "@/extensions/nexus_integration/selectors";
+import { isLoggedIn } from "@/extensions/nexus_integration/selectors";
+
+import { downloadModFromBrowse } from "../util/downloadModFromBrowse";
 
 type ModFeed = "latest" | "trending";
 
@@ -26,8 +28,13 @@ function extraValue(mod: IModListItem, id: string): number | undefined {
   return typeof entry?.value === "number" ? entry.value : undefined;
 }
 
-function ModCard(props: { mod: IModListItem; t: IModBrowsePanelProps["t"] }) {
-  const { mod, t } = props;
+function ModCard(props: {
+  api: IExtensionApi;
+  gameId: string;
+  mod: IModListItem;
+  t: IModBrowsePanelProps["t"];
+}) {
+  const { api, gameId, mod, t } = props;
   const endorsements = extraValue(mod, "endorsements");
   const downloads = extraValue(mod, "downloads");
 
@@ -70,14 +77,28 @@ function ModCard(props: { mod: IModListItem; t: IModBrowsePanelProps["t"] }) {
             </span>
           ) : null}
         </div>
-        <Button
-          appearance="moderate"
-          brand="neutral"
-          leftIconPath={mdiOpenInNew}
-          onClick={() => window.api.shell.openUrl(mod.link)}
-        >
-          {t("collection:browse.mods.viewOnSite")}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            appearance="moderate"
+            brand="primary"
+            leftIconPath={mdiDownload}
+            onClick={() => {
+              downloadModFromBrowse(api, gameId, mod).catch((err: Error) => {
+                api.showErrorNotification("Failed to download mod", err, { allowReport: false });
+              });
+            }}
+          >
+            {t("collection:browse.mods.download")}
+          </Button>
+          <Button
+            appearance="moderate"
+            brand="neutral"
+            leftIconPath={mdiOpenInNew}
+            onClick={() => window.api.shell.openUrl(mod.link)}
+          >
+            {t("collection:browse.mods.viewOnSite")}
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -91,11 +112,7 @@ export function ModBrowsePanel(props: IModBrowsePanelProps) {
   const [error, setError] = useState<Error | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  const loggedIn = useSelector((state: IState) => {
-    const nexus = state.confidential?.account?.["nexus"];
-    return !!(nexus?.APIKey || nexus?.OAuthCredentials);
-  });
-  const premium = useSelector((state: IState) => isPremium(state));
+  const loggedIn = useSelector((state: IState) => isLoggedIn(state));
 
   useEffect(() => {
     if (!gameId) {
@@ -150,26 +167,6 @@ export function ModBrowsePanel(props: IModBrowsePanelProps) {
         </div>
       ) : null}
 
-      {loggedIn && !premium ? (
-        <div className="rounded border border-neutral-700 bg-neutral-900 p-4">
-          <Typography appearance="moderate" brand="neutral" typographyType="body-sm">
-            {t("collection:browse.mods.premiumPrompt")}
-          </Typography>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button
-              appearance="moderate"
-              brand="primary"
-              leftIconPath={mdiDownload}
-              onClick={() =>
-                window.api.shell.openUrl("https://users.nexusmods.com/account/billing/premium")
-              }
-            >
-              {t("collection:browse.mods.goPremium")}
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
       <div className="flex items-center gap-x-2">
         <Button
           appearance="moderate"
@@ -203,7 +200,7 @@ export function ModBrowsePanel(props: IModBrowsePanelProps) {
         skeletonCount={12}
       >
         {mods.map((mod) => (
-          <ModCard key={`${mod.link}-${mod.name}`} mod={mod} t={t} />
+          <ModCard key={`${mod.link}-${mod.name}`} api={api} gameId={gameId} mod={mod} t={t} />
         ))}
       </Listing>
     </div>
