@@ -1,12 +1,7 @@
 import * as path from "path";
 
 import { types, util } from "@nexusmods/vortex-api";
-import {
-  buildMyGamesPath,
-  getWineDocumentsPath,
-  inferProtonPathsFromGamePath,
-  myGamesFolderCaseVariants,
-} from "@vortex/shared/linux";
+import { inferProtonPathsFromGamePath, myGamesFolderCaseVariants } from "@vortex/shared/linux";
 
 type Discovery = types.IDiscoveryResult & { winePrefixPath?: string };
 
@@ -26,7 +21,7 @@ export function getCachedMyGamesRoot(gameId: string): string | undefined {
 
 export function documentsPathForSaves(discovery: Discovery | undefined): string {
   if (discovery?.winePrefixPath !== undefined) {
-    return getWineDocumentsPath(discovery.winePrefixPath);
+    return path.join(discovery.winePrefixPath, "drive_c", "users", "steamuser", "Documents");
   }
   return util.getVortexPath("documents");
 }
@@ -40,7 +35,7 @@ export function syncMyGamesPath(
   if (cached !== undefined) {
     return cached;
   }
-  return buildMyGamesPath(documentsPathForSaves(discovery), gameFolderName);
+  return path.join(documentsPathForSaves(discovery), "My Games", gameFolderName);
 }
 
 async function pathExists(

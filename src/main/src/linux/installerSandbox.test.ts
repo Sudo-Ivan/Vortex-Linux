@@ -24,14 +24,14 @@ describe("installerSandbox", () => {
   });
 
   it("deduplicates sandbox paths", () => {
-    expect(uniqueSandboxPaths(["/tmp/a", "/tmp/a"])).toEqual(["/tmp/a"]);
+    expect(uniqueSandboxPaths(["/tmp/a", "/tmp/a"])).toEqual([path.resolve("/tmp/a")]);
   });
 
   it("builds default read-only paths for an executable", () => {
     const paths = buildDefaultReadOnlyPaths("/opt/vortex/fomod/ModInstallerIPC.exe", "/tmp/work");
-    expect(paths).toContain("/opt/vortex/fomod");
-    expect(paths).toContain("/tmp/work");
-    expect(paths).toContain("/usr/lib");
+    expect(paths).toContain(path.resolve("/opt/vortex/fomod"));
+    expect(paths).toContain(path.resolve("/tmp/work"));
+    expect(paths).toContain(path.resolve("/usr/lib"));
   });
 
   it("builds argv for the sandbox helper", () => {
