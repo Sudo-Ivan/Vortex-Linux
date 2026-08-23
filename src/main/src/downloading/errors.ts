@@ -1,6 +1,11 @@
 import type { ResolvedEndpoint } from "@vortex/shared/download";
 import { DownloadError } from "@vortex/shared/errors";
-import { TimeoutError, HTTPError, RequestError } from "got";
+import { TimeoutError, HTTPError, RequestError, AbortError } from "got";
+
+export function isCancellation(err: unknown): boolean {
+  if (err instanceof AbortError) return true;
+  return err instanceof DOMException && err.name === "AbortError";
+}
 
 export function toNetworkError(endpoint: URL | ResolvedEndpoint, err: unknown): DownloadError {
   const url = endpoint instanceof URL ? endpoint : endpoint.url;

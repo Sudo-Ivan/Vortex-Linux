@@ -3,6 +3,7 @@ import path from "path";
 
 import { parse } from "simple-vdf";
 
+import { findLinuxSteamPath } from "../../../util/linux/steamPaths";
 import Steam from "../../../util/Steam";
 import type {
   GameMediaItem,
@@ -21,7 +22,6 @@ export async function getSteamMedia(
   const res: Record<string, GameMediaSource> = {};
   let steamPathExe = await Steam.getGameStorePath();
   if (steamPathExe === undefined && process.platform === "linux") {
-    const { findLinuxSteamPath } = await import("../../../util/linux/steamPaths");
     steamPathExe = findLinuxSteamPath();
   }
   if (steamPathExe === undefined) {

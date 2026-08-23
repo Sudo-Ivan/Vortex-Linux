@@ -78,7 +78,7 @@ async function confirmCaseMismatchesBeforeDeploy(
   }
 
   const result = await api.showDialog(
-    "warning",
+    "question",
     "Case sensitivity warning",
     {
       text:
