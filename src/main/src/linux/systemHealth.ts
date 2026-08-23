@@ -9,6 +9,7 @@ import {
   ensureLinuxDesktopIntegration,
   shouldInstallLinuxDesktopIntegration,
 } from "./desktopIntegration";
+import { getInstallerSandboxBinaryPath, probeInstallerSandboxAbi } from "./installerSandbox";
 
 const execFileAsync = promisify(execFile);
 
@@ -403,6 +404,35 @@ function checkFomodNativeModule(): ILinuxHealthCheck {
   };
 }
 
+async function checkInstallerSandbox(): Promise<ILinuxHealthCheck> {
+  const binaryPath = getInstallerSandboxBinaryPath();
+  if (binaryPath === undefined) {
+    return {
+      id: "installer_sandbox",
+      status: "warning",
+      summary: "Installer sandbox helper was not found",
+      detail: "FOMOD IPC installers will run without Landlock and seccomp isolation.",
+    };
+  }
+
+  const abi = await probeInstallerSandboxAbi();
+  if (abi === undefined) {
+    return {
+      id: "installer_sandbox",
+      status: "warning",
+      summary: "Landlock installer sandbox is unavailable",
+      detail: binaryPath,
+    };
+  }
+
+  return {
+    id: "installer_sandbox",
+    status: "ok",
+    summary: `Installer sandbox is available (Landlock ABI ${abi})`,
+    detail: binaryPath,
+  };
+}
+
 async function checkXdgUtils(): Promise<ILinuxHealthCheck> {
   try {
     await execFileAsync("xdg-settings", ["--version"]);
@@ -445,6 +475,7 @@ export async function collectLinuxSystemHealth(
     Promise.resolve(checkSteamInstallation(context)),
     checkXdgUtils(),
     Promise.resolve(checkFomodNativeModule()),
+    checkInstallerSandbox(),
   ]);
 
   return {

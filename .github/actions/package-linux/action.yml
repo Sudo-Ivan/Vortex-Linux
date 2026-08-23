@@ -79,6 +79,7 @@ runs:
         sudo apt-get install -y \
           libfontconfig1-dev \
           libfuse2 \
+          libseccomp-dev \
           rpm \
           fakeroot
 

@@ -491,6 +491,7 @@ export interface UpdaterApi {
 export interface LinuxApi {
   getSystemHealth(): Promise<LinuxSystemHealthReport>;
   repairDesktopIntegration(): Promise<LinuxDesktopRepairResult>;
+  supportsInstallerSandbox(): Promise<boolean>;
 }
 
 /** API for interacting with the DownloadManager in main */

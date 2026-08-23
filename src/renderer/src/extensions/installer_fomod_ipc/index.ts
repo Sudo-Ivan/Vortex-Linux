@@ -15,9 +15,10 @@ import Sandbox from "./views/Sandbox";
 const main = (context: IExtensionContext): boolean => {
   context.registerReducer(["settings", "mods"], settingsReducer);
 
-  const osSupportsAppContainer = SupportsAppContainer?.() ?? false;
+  const osSupportsInstallerSandbox =
+    process.platform === "win32" ? (SupportsAppContainer?.() ?? false) : false;
   context.registerSettings("Workarounds", Sandbox, () => ({
-    osSupportsAppContainer,
+    osSupportsInstallerSandbox,
   }));
 
   context.registerInstaller(

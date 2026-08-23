@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { existsSync } from "node:fs";
 import { cp, mkdir } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { join, basename, dirname } from "node:path";
@@ -28,6 +29,12 @@ const dotnetprobeFiles = await glob("tools/dotnetprobe/dist/*", { cwd: WORKSPACE
 for (const file of dotnetprobeFiles) {
   const rel = file.slice("tools/dotnetprobe/dist/".length);
   await copy(join(WORKSPACE, file), join(BUILD, "assets", rel));
+}
+
+// @tools/installer-sandbox compiled output
+const installerSandboxBinary = join(WORKSPACE, "tools/installer-sandbox/dist/installer-sandbox");
+if (existsSync(installerSandboxBinary)) {
+  await copy(installerSandboxBinary, join(BUILD, "assets/installer-sandbox"));
 }
 
 // SCSS sources for runtime stylesheet compiler load paths

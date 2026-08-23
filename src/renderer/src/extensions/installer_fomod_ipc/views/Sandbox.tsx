@@ -1,5 +1,5 @@
-import React, { useContext } from "react";
-import { Alert, ControlLabel, FormGroup } from "react-bootstrap";
+import React, { useContext, useEffect, useState } from "react";
+import { ControlLabel, FormGroup } from "react-bootstrap";
 import { useTranslation } from "react-i18next";
 import { useDispatch, useSelector } from "react-redux";
 
@@ -9,22 +9,46 @@ import { MainContext } from "../../../views/MainWindow";
 import { setInstallerSandbox } from "../actions/sandbox";
 
 export interface IWorkaroundsProps {
-  osSupportsAppContainer: boolean;
+  osSupportsInstallerSandbox: boolean;
 }
 
 function Sandbox(props: IWorkaroundsProps): React.ReactElement<any, any> {
-  const { osSupportsAppContainer } = props;
+  const { osSupportsInstallerSandbox: initialSupport } = props;
   const { t } = useTranslation();
 
   const sandboxEnabled = useSelector(
     (state: IState) => state.settings.mods.installerSandbox ?? true,
   );
   const dispatch = useDispatch();
-
   const context = useContext(MainContext);
+  const [osSupportsInstallerSandbox, setOsSupportsInstallerSandbox] = useState(initialSupport);
+
+  useEffect(() => {
+    if (process.platform !== "linux") {
+      return;
+    }
+
+    let cancelled = false;
+    void window.api.linux
+      .supportsInstallerSandbox()
+      .then((supported) => {
+        if (!cancelled) {
+          setOsSupportsInstallerSandbox(supported);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOsSupportsInstallerSandbox(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const toggleSandbox = React.useCallback(() => {
-    if (osSupportsAppContainer) {
+    if (osSupportsInstallerSandbox) {
       context.api.events.emit(
         "analytics-track-click-event",
         "Workarounds",
@@ -32,16 +56,16 @@ function Sandbox(props: IWorkaroundsProps): React.ReactElement<any, any> {
       );
       dispatch(setInstallerSandbox(!sandboxEnabled));
     }
-  }, [sandboxEnabled]);
+  }, [context.api.events, dispatch, osSupportsInstallerSandbox, sandboxEnabled]);
 
   return (
     <form>
       <FormGroup id="dotnet-appcontainer" controlId="appcontainer">
         <ControlLabel>{t("Installer Sandbox")}</ControlLabel>
         <Toggle
-          checked={sandboxEnabled && osSupportsAppContainer}
+          checked={sandboxEnabled && osSupportsInstallerSandbox}
           onToggle={toggleSandbox}
-          disabled={!osSupportsAppContainer}
+          disabled={!osSupportsInstallerSandbox}
         >
           {t("Enable Sandbox")}
         </Toggle>

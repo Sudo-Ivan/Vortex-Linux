@@ -138,6 +138,10 @@
             "target": "build",
             "projects": "@tools/dotnetprobe"
           },
+          {
+            "target": "build",
+            "projects": "@tools/installer-sandbox"
+          },
           "sbom"
         ],
         "cache": true,

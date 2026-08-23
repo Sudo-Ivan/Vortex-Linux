@@ -7,6 +7,8 @@ import {
   TCPTransport,
 } from "@nexusmods/fomod-installer-ipc";
 
+import { LinuxSandboxProcessLauncher } from "../linux/LinuxSandboxProcessLauncher";
+
 /**
  * Helper function to create connection strategies from launcher options
  */
@@ -22,35 +24,41 @@ export const createConnectionStrategies = (options?: {
   const containerName = options?.containerName || "fomod_installer";
 
   if (securityLevel === SecurityLevel.Sandbox) {
-    const namedPipeTransport = new NamedPipeTransport();
-    const sandboxLauncher = new SandboxProcessLauncher({
-      containerName,
-      transport: namedPipeTransport,
-    });
+    if (process.platform === "win32") {
+      const namedPipeTransport = new NamedPipeTransport();
+      const sandboxLauncher = new SandboxProcessLauncher({
+        containerName,
+        transport: namedPipeTransport,
+      });
 
-    // Named Pipe with sandbox launcher (ACL configuration handled automatically)
-    strategies.push({
-      transport: namedPipeTransport,
-      launcher: sandboxLauncher,
-    });
+      strategies.push({
+        transport: namedPipeTransport,
+        launcher: sandboxLauncher,
+      });
+    } else if (process.platform === "linux") {
+      strategies.push({
+        transport: new TCPTransport(),
+        launcher: new LinuxSandboxProcessLauncher(),
+      });
+    }
   }
 
   if (
     (securityLevel === SecurityLevel.Sandbox && allowFallback) ||
     securityLevel === SecurityLevel.Regular
   ) {
-    // Named Pipe with regular launcher
-    strategies.push({
-      transport: new NamedPipeTransport(),
-      launcher: new RegularProcessLauncher(),
-    });
+    if (process.platform === "win32") {
+      strategies.push({
+        transport: new NamedPipeTransport(),
+        launcher: new RegularProcessLauncher(),
+      });
+    }
   }
 
   if (
     (securityLevel === SecurityLevel.Sandbox && allowFallback) ||
     (securityLevel === SecurityLevel.Regular && allowFallback)
   ) {
-    // TCP with regular launcher
     strategies.push({
       transport: new TCPTransport(),
       launcher: new RegularProcessLauncher(),

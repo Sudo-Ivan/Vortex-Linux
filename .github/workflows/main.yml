@@ -43,7 +43,7 @@ jobs:
       # NOTE(erri120): fontconfig required by font-scanner required by theme-switcher
       - name: Install fontconfig
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libseccomp-dev
 
       - name: Cache Nx
         uses: actions/cache@v6

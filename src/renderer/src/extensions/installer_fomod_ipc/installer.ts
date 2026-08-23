@@ -15,6 +15,7 @@ import {
 } from "../installer_fomod_shared/utils/gameSupport";
 import type { IInstallationDetails } from "../mod_management/types/InstallFunc";
 import { CSharpDelegates } from "./delegates/CSharpDelegates";
+import { LinuxSandboxProcessLauncher } from "./linux/LinuxSandboxProcessLauncher";
 import { createConnectionStrategies } from "./utils/connectionStrategy";
 import { VortexIPCConnection } from "./utils/VortexIPCConnection";
 
@@ -57,6 +58,13 @@ export const install = async (
       securityLevel: securityLevel,
       allowFallback: true,
     });
+    if (securityLevel === SecurityLevel.Sandbox) {
+      for (const strategy of strategies) {
+        if (strategy.launcher instanceof LinuxSandboxProcessLauncher) {
+          strategy.launcher.addAllowedPaths([destinationPath]);
+        }
+      }
+    }
     const modName =
       details?.modReference?.id || path.basename(archivePath, path.extname(archivePath));
     connection = new VortexIPCConnection(api, strategies, 30000, modName);

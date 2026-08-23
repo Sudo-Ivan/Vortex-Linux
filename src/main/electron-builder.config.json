@@ -91,6 +91,7 @@
     "node_modules/react-select/scss",
     "node_modules/@nexusmods/fomod-installer-ipc/dist/*.exe",
     "assets/dotnetprobe*",
+    "assets/installer-sandbox",
     "assets/*.exe",
     "assets/css/**",
     "**/*.node",

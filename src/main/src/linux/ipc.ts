@@ -1,4 +1,5 @@
 import { betterIpcMain } from "../ipc";
+import { isInstallerSandboxSupported } from "./installerSandbox";
 import { collectLinuxSystemHealth, repairLinuxDesktopIntegration } from "./systemHealth";
 
 export function initLinuxIpc(): void {
@@ -11,4 +12,6 @@ export function initLinuxIpc(): void {
   betterIpcMain.handle("linux:repair-desktop-integration", () => {
     return repairLinuxDesktopIntegration(process.execPath);
   });
+
+  betterIpcMain.handle("linux:supports-installer-sandbox", () => isInstallerSandboxSupported());
 }

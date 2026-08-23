@@ -374,6 +374,7 @@ export interface InvokeChannels {
   // Linux: Query system integration health and repair desktop files
   "linux:get-system-health": () => Promise<LinuxSystemHealthReport>;
   "linux:repair-desktop-integration": () => Promise<LinuxDesktopRepairResult>;
+  "linux:supports-installer-sandbox": () => Promise<boolean>;
   // Dialog channels
   "dialog:showOpen": (options: OpenDialogOptions) => Promise<OpenDialogReturnValue>;
   "dialog:showSave": (options: SaveDialogOptions) => Promise<SaveDialogReturnValue>;
