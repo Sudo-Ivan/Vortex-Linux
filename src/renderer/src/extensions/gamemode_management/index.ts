@@ -494,21 +494,18 @@ function removeDisappearedGames(
 
   log("info", "remove disappeared games");
 
-  const assertRequiredFiles = (requiredFiles: string[], gameId: string): PromiseBB<void> => {
-    if (requiredFiles === undefined) {
+  const assertRequiredFiles = (
+    requiredFiles: string[] | undefined,
+    gameId: string,
+  ): PromiseBB<void> => {
+    if (requiredFiles === undefined || requiredFiles.length === 0) {
       return PromiseBB.resolve();
     }
-    return PromiseBB.map(requiredFiles, (file) =>
-      fsExtra.stat(path.join(discovered[gameId].path, file)),
-    )
-      .then(() => undefined)
-      .catch((err) => {
-        if (err.code === "ENOENT") {
-          return PromiseBB.reject(err);
-        } else {
-          return PromiseBB.resolve();
-        }
-      });
+    const gamePath = discovered[gameId]?.path;
+    if (gamePath === undefined) {
+      return PromiseBB.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+    }
+    return PromiseBB.resolve(verifyRequiredFiles(gamePath, requiredFiles)).then(() => undefined);
   };
 
   return PromiseBB.map(

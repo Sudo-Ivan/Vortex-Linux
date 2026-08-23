@@ -1,10 +1,9 @@
 import { knownGames } from "@/extensions/gamemode_management/selectors";
 import renderModName from "@/extensions/mod_management/util/modName";
-import { allowsInAppDownloads } from "@/extensions/nexus_integration/selectors";
+import { shouldShowPremiumAd } from "@/extensions/nexus_integration/selectors";
 import { nexusGames } from "@/extensions/nexus_integration/util";
 import { convertGameIdReverse } from "@/extensions/nexus_integration/util/convertGameId";
 import { decodeUID } from "@/extensions/nexus_integration/util/UIDs";
-import { getNexusWebsiteUrl } from "@/extensions/nexus_integration/nexusFork";
 import { setModsEnabled } from "@/extensions/profile_management/actions/profiles";
 import { activeProfile } from "@/extensions/profile_management/selectors";
 import { log } from "@/logging";
@@ -38,7 +37,7 @@ function modPageUrl(ref: INexusFileRef): string | undefined {
   // modUID is empty when the source data lacked a mod id; decode only when present.
   const mod = ref.modUID ? decodeUID(ref.modUID) : undefined;
   const domain = mod ? nexusDomain(mod.gameId) : undefined;
-  return mod && domain ? `${getNexusWebsiteUrl()}/${domain}/mods/${mod.id}` : undefined;
+  return mod && domain ? `https://www.nexusmods.com/${domain}/mods/${mod.id}` : undefined;
 }
 
 /**
@@ -53,7 +52,7 @@ export async function downloadFileRequirement(
   identity?: IssueAnalyticsIdentity,
   enabledFile?: IInstalledFile,
 ): Promise<boolean> {
-  if (!allowsInAppDownloads(api.getState())) {
+  if (shouldShowPremiumAd(api.getState())) {
     openFilePage(api, candidate);
     return false;
   }

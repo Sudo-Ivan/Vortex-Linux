@@ -1,3 +1,5 @@
+import type { FileSystemErrorCode } from "@nexusmods/contracts";
+
 import { VortexError } from "../errors/base";
 
 export type DownloadErrorPayload =
@@ -8,7 +10,7 @@ export type DownloadErrorPayload =
   | { code: "precondition-failed"; url: URL }
   | { code: "protocol-violation"; url: URL }
   | { code: "is-html"; url: URL }
-  | { code: "fs-error"; path: string }
+  | { code: "fs-error"; path: string; reason?: FileSystemErrorCode; isTransient?: boolean }
   | { code: "resolver-error" };
 
 export class DownloadError extends Error {
@@ -76,36 +78,29 @@ function captureStackTrace<T extends Error>(
   }
 }
 
-/**
- * @public
- * @deprecated Use `VortexError` directly
- */
-export class UserCanceled extends VortexError<"user-canceled"> {
+export class UserCanceled extends Error {
   public skipped: boolean;
 
   constructor(skipped?: boolean) {
-    super("canceled by user", { kind: "user-canceled", skipped: skipped ?? false });
+    super("canceled by user");
+    this.name = this.constructor.name;
     this.skipped = skipped ?? false;
   }
 }
 
-/**
- * @public
- * @deprecated Use `VortexError` directly
- */
-export class DataInvalid extends VortexError<"data-invalid"> {
+export class DataInvalid extends Error {
   constructor(message: string) {
-    super(message, { kind: "data-invalid" });
+    super(message);
+    this.name = this.constructor.name;
   }
 }
 
-/**
- * @public
- * @deprecated Use `VortexError` directly
- */
-export class NotSupportedError extends VortexError<"not-supported"> {
+export class NotSupportedError extends Error {
   constructor() {
-    super("Not supported", { kind: "not-supported" });
+    super("Not supported");
+    captureStackTrace(this, NotSupportedError);
+
+    this.name = this.constructor.name;
   }
 }
 
@@ -143,27 +138,23 @@ export class InsufficientDiskSpace extends Error {
   }
 }
 
-/**
- * @public
- * @deprecated Use `VortexError` directly
- */
-export class ProcessCanceled extends VortexError<"process-canceled"> {
+export class ProcessCanceled extends Error {
+  private mExtraInfo: unknown;
   constructor(message: string, extraInfo?: unknown) {
-    super(message, { kind: "process-canceled", extraInfo });
+    super(message);
+    this.name = this.constructor.name;
+    this.mExtraInfo = extraInfo;
   }
 
   public get extraInfo(): unknown {
-    return this.data.extraInfo;
+    return this.mExtraInfo;
   }
 }
 
-/**
- * @public
- * @deprecated Use `VortexError` directly
- */
-export class ArgumentInvalid extends VortexError<"argument-invalid"> {
+export class ArgumentInvalid extends Error {
   constructor(argument: string) {
-    super(`Invalid argument: "${argument}"`, { kind: "argument-invalid", argument });
+    super(`Invalid argument: "${argument}"`);
+    this.name = this.constructor.name;
   }
 }
 
@@ -181,17 +172,16 @@ export class DocumentsPathMissing extends Error {
   }
 }
 
-/**
- * @public
- * @deprecated Use `VortexError` directly
- */
-export class SetupError extends VortexError<"setup-error"> {
+export class SetupError extends Error {
+  private mComponent: string | undefined;
   constructor(message: string, component?: string) {
-    super(message, { kind: "setup-error", component });
+    super(message);
+    this.name = this.constructor.name;
+    this.mComponent = component;
   }
 
   public get component(): string | undefined {
-    return this.data.component;
+    return this.mComponent;
   }
 }
 
@@ -227,27 +217,23 @@ export class HTTPError extends Error {
   }
 }
 
-/**
- * @public
- * @deprecated Use `VortexError` directly
- */
-export class MissingInterpreter extends VortexError<"missing-interpreter"> {
+export class MissingInterpreter extends Error {
+  private mURL: string | undefined;
   constructor(message: string, url?: string) {
-    super(message, { kind: "missing-interpreter", url });
+    super(message);
+    this.name = this.constructor.name;
+    this.mURL = url;
   }
 
   public get url(): string | undefined {
-    return this.data.url;
+    return this.mURL;
   }
 }
 
-/**
- * @public
- * @deprecated Use `VortexError` directly
- */
-export class NotFound extends VortexError<"not-found"> {
+export class NotFound extends Error {
   constructor(what: string) {
-    super(`Not found: "${what}"`, { kind: "not-found", resourceType: what });
+    super(`Not found: "${what}"`);
+    this.name = this.constructor.name;
   }
 }
 
@@ -338,10 +324,6 @@ export class DownloadIsHTML extends Error {
   }
 }
 
-/**
- * @public
- * @deprecated Use `VortexError` directly
- */
 export class CycleError extends VortexError<"cycle-error"> {
   constructor(cycles: string[][]) {
     super("Rules contain cycles", { kind: "cycle-error", cycles });

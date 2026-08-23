@@ -1050,7 +1050,7 @@ class Settings extends ComponentEx<IProps, IComponentState> {
       ]);
 
       let suggestion: string;
-      if (modPathStats.dev === userDataStats.dev || process.platform !== "win32") {
+      if (modPathStats.dev === userDataStats.dev) {
         suggestion = path.join("{USERDATA}", "{game}", "mods");
       } else {
         const volume = winapi.GetVolumePathName(modPaths[""]);

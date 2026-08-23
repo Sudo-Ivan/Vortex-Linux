@@ -12,6 +12,7 @@
     "target": "esnext",
     "module": "esnext",
     "moduleResolution": "bundler",
+    "customConditions": ["development"],
     "lib": ["ESNext"],
     "types": [],
     "allowJs": false,

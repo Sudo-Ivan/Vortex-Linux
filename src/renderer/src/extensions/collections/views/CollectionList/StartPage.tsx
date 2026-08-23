@@ -33,6 +33,10 @@ import {
   NEXUS_BASE_URL,
 } from "../../constants";
 import type InfoCache from "../../util/InfoCache";
+import {
+  exportOfflineModpackInteractive,
+  importOfflineModpackInteractive,
+} from "../../util/offlineExport";
 import { validateName } from "../../util/transformCollection";
 import { hasEditPermissions } from "../../util/util";
 import CollectionThumbnail from "../CollectionTile";
@@ -141,6 +145,8 @@ interface ICreateCardProps {
   onCreateFromProfile: () => void;
   onCreateEmpty: () => void;
   onCreateQuickCollection: () => void;
+  onExportOffline: () => void;
+  onImportOffline: () => void;
   onTrackClick: (namespace: string, eventName: string) => void;
 }
 
@@ -177,8 +183,30 @@ function CreateCard(props: ICreateCardProps) {
           props.onCreateQuickCollection();
         },
       },
+      {
+        title: "Export Offline Modpack",
+        icon: "export",
+        action: () => {
+          onTrackClick("Collections", "Export Offline Modpack");
+          props.onExportOffline();
+        },
+      },
+      {
+        title: "Import Modpack",
+        icon: "import",
+        action: () => {
+          onTrackClick("Collections", "Import Modpack");
+          props.onImportOffline();
+        },
+      },
     ];
-  }, [props.onCreateFromProfile, props.onCreateEmpty, props.onCreateQuickCollection]);
+  }, [
+    props.onCreateFromProfile,
+    props.onCreateEmpty,
+    props.onCreateQuickCollection,
+    props.onExportOffline,
+    props.onImportOffline,
+  ]);
 
   return (
     <Panel bsStyle="default" className={classes.join(" ")}>
@@ -389,6 +417,8 @@ class StartPage extends ComponentEx<IProps, IComponentState> {
                   onCreateEmpty={this.fromEmpty}
                   onCreateFromProfile={this.fromProfile}
                   onCreateQuickCollection={this.quickCollection}
+                  onExportOffline={this.exportOffline}
+                  onImportOffline={this.importOffline}
                   onTrackClick={this.trackEvent}
                 />
 
@@ -593,6 +623,25 @@ class StartPage extends ComponentEx<IProps, IComponentState> {
         this.context.api.showErrorNotification("Failed to init collection", unknownToError(err));
       }
     }
+  };
+
+  private exportOffline = () => {
+    exportOfflineModpackInteractive(this.context.api).catch((err: unknown) => {
+      if (!(err instanceof UserCanceled)) {
+        this.context.api.showErrorNotification(
+          "Failed to export offline modpack",
+          unknownToError(err),
+        );
+      }
+    });
+  };
+
+  private importOffline = () => {
+    importOfflineModpackInteractive(this.context.api).catch((err: unknown) => {
+      if (!(err instanceof UserCanceled)) {
+        this.context.api.showErrorNotification("Failed to import modpack", unknownToError(err));
+      }
+    });
   };
 
   private fromEmpty = async () => {

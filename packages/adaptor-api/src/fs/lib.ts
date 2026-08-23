@@ -3,12 +3,14 @@ export type {
   FileStatus,
   FileSystem,
   FileSystemBackend,
+  FileSystemErrorCode,
   StatResult,
   Status,
   StatusTime,
   SymLinkData,
   SymLinkStatus,
 } from "./filesystem";
+export { FileSystemError } from "./filesystem";
 
 export type { Pattern } from "./matcher";
 export { matches } from "./matcher";

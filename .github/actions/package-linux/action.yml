@@ -250,6 +250,32 @@ runs:
           readelf -d "${fomod_native}" | grep -E 'RUNPATH|RPATH' || true
           exit 1
         fi
+        if ! ldd "${fomod_native}" | grep -q 'ModInstaller.Native.so'; then
+          echo "fomod-installer-native.node cannot resolve ModInstaller.Native.so at runtime" >&2
+          ldd "${fomod_native}" || true
+          exit 1
+        fi
+        loot_native="$(find ./dist/linux-unpacked/resources/app.asar.unpacked/bundledPlugins/gamebryo-plugin-management -name 'node-loot.node' -print -quit)"
+        if [[ -n "${loot_native}" ]]; then
+          loot_so="$(dirname "${loot_native}")/libloot.so"
+          if [[ ! -f "${loot_so}" ]]; then
+            echo "libloot.so missing beside packaged node-loot.node" >&2
+            exit 1
+          fi
+          if ! ldd "${loot_native}" | grep -q 'libloot.so'; then
+            echo "node-loot.node cannot resolve libloot.so at runtime" >&2
+            ldd "${loot_native}" || true
+            exit 1
+          fi
+          if ! readelf -d "${loot_native}" | grep -q 'RUNPATH.*\$ORIGIN'; then
+            echo "node-loot.node is missing relocatable RUNPATH" >&2
+            readelf -d "${loot_native}" | grep -E 'RUNPATH|RPATH' || true
+            exit 1
+          fi
+          echo "LOOT native validation successful"
+        else
+          echo "node-loot.node not bundled (LOOT prebuilds missing, extension still ships without native sort)"
+        fi
         if [[ ! -d ./dist/linux-unpacked ]]; then
           echo "linux-unpacked directory not found in ./dist/" >&2
           ls -la ./dist/ || true

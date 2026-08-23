@@ -4,7 +4,7 @@ import turbowalk from "turbowalk";
 
 import { log } from "../../logging";
 import type { IExtensionApi } from "../../types/IExtensionContext";
-import { collectCaseMismatchWarnings } from "../../util/caseAwarePath";
+import { collectCaseMismatchWarnings, resolveCaseAwarePath } from "../../util/caseAwarePath";
 import { UserCanceled } from "../../util/CustomErrors";
 import * as fs from "../../util/fs";
 import getNormalizeFunc, { type Normalize } from "../../util/getNormalizeFunc";
@@ -35,16 +35,10 @@ async function ensureWritable(api: IExtensionApi, modPath: string): Promise<void
   );
 }
 
-async function warnAboutCaseMismatches(
-  api: IExtensionApi,
-  destinationPath: string,
+async function gatherDeployRelativePaths(
   installationPath: string,
   mods: IMod[],
-): Promise<void> {
-  if (process.platform === "win32") {
-    return;
-  }
-
+): Promise<string[]> {
   const relativePaths: string[] = [];
   for (const mod of mods) {
     const modPath = path.join(installationPath, mod.installationPath);
@@ -65,6 +59,48 @@ async function warnAboutCaseMismatches(
     } catch {
       continue;
     }
+  }
+  return relativePaths;
+}
+
+async function confirmCaseMismatchesBeforeDeploy(
+  api: IExtensionApi,
+  destinationPath: string,
+  relativePaths: string[],
+): Promise<void> {
+  if (process.platform === "win32") {
+    return;
+  }
+
+  const warnings = await collectCaseMismatchWarnings(destinationPath, relativePaths.slice(0, 250));
+  if (warnings.length === 0) {
+    return;
+  }
+
+  const result = await api.showDialog(
+    "warning",
+    "Case sensitivity warning",
+    {
+      text:
+        "Some mod files use different path casing than what already exists in the game folder. " +
+        "This can break mods on Linux.\n\n" +
+        warnings.slice(0, 5).join("\n"),
+    },
+    [{ label: "Cancel deploy" }, { label: "Deploy anyway" }],
+  );
+
+  if (result.action === "Cancel deploy") {
+    throw new UserCanceled();
+  }
+}
+
+async function warnAboutCaseMismatches(
+  api: IExtensionApi,
+  destinationPath: string,
+  relativePaths: string[],
+): Promise<void> {
+  if (process.platform === "win32") {
+    return;
   }
 
   const warnings = await collectCaseMismatchWarnings(destinationPath, relativePaths.slice(0, 250));
@@ -118,6 +154,8 @@ async function deployMods(
 
   try {
     await ensureWritable(api, destinationPath);
+    const relativePaths = await gatherDeployRelativePaths(installationPath, mods);
+    await confirmCaseMismatchesBeforeDeploy(api, destinationPath, relativePaths);
     const normalize: Normalize = await getNormalizeFunc(destinationPath);
     await method.prepare(destinationPath, true, lastActivation, normalize);
 
@@ -128,14 +166,16 @@ async function deployMods(
       }
       const modPath = path.join(installationPath, mod.installationPath);
       if (mod.fileOverrides !== undefined) {
-        mod.fileOverrides
-          .map((file) => {
-            const relPath = path.relative(destinationPath, file);
-            const relPathWithSource = path.join(mod.installationPath, relPath);
-            const normRelPathWithSource = normalize(relPathWithSource);
-            return normRelPathWithSource;
-          })
-          .forEach((file) => skipFiles.add(file));
+        for (const file of mod.fileOverrides) {
+          const relPath = path.relative(destinationPath, file);
+          const caseAwareRel =
+            process.platform === "win32"
+              ? relPath
+              : ((await resolveCaseAwarePath(destinationPath, relPath)) ?? relPath);
+          const relPathWithSource = path.join(mod.installationPath, caseAwareRel);
+          const normRelPathWithSource = normalize(relPathWithSource);
+          skipFiles.add(normRelPathWithSource);
+        }
       }
       await method.activate(modPath, mod.installationPath, subDir(mod), skipFiles);
     }
@@ -149,7 +189,7 @@ async function deployMods(
       new Set<string>(),
     );
 
-    await warnAboutCaseMismatches(api, destinationPath, installationPath, mods);
+    await warnAboutCaseMismatches(api, destinationPath, relativePaths);
   } catch (err) {
     if (method.cancel !== undefined) {
       method.cancel(gameId, destinationPath, installationPath);

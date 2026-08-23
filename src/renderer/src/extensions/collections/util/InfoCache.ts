@@ -60,6 +60,36 @@ class InfoCache {
     return collections[slug].info;
   }
 
+  public async getLocalCollectionInfo(
+    collection: IMod,
+    gameId: string,
+  ): Promise<ICollection | undefined> {
+    if (collection.installationPath === undefined) {
+      return undefined;
+    }
+    const stagingPath = selectors.installPathForGame(this.mApi.getState(), gameId);
+    try {
+      const local = await readCollection(
+        this.mApi,
+        path.join(stagingPath, collection.installationPath, "collection.json"),
+      );
+      return {
+        id: collection.id as unknown as number,
+        name: local.info.name,
+        slug: collection.id,
+        summary: local.info.description,
+        description: local.info.description,
+        user: { name: local.info.author, memberId: undefined },
+        game: { domainName: local.info.domainName },
+      } as ICollection;
+    } catch (err) {
+      if (getErrorCode(err) !== "ENOENT") {
+        log("warn", "failed to read local collection manifest", { err });
+      }
+      return undefined;
+    }
+  }
+
   public async clearCache() {
     const { store } = this.mApi;
     const state = this.mApi.getState();

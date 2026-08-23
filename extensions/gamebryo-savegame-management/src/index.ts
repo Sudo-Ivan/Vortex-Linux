@@ -165,12 +165,10 @@ function openSavegamesDirectory(api: types.IExtensionApi, profileId?: string) {
     profileId = selectors.activeProfile(state).id;
   }
   const profile = state.persistent.profiles[profileId];
-  const hasLocalSaves = util.getSafe(profile, ["features", "local_saves"], false);
-  const profileSavesPath = hasLocalSaves
-    ? path.join(mygamesPath(profile.gameId), "Saves", profile.id)
-    : path.join(mygamesPath(profile.gameId), "Saves");
-  fs.ensureDirAsync(profileSavesPath)
-    .then(() => util.opn(profileSavesPath))
+  ensureMyGamesPathResolved(profile.gameId)
+    .then(() => getSavesPath(profile))
+    .then((savesPath) => fs.ensureDirAsync(savesPath).then(() => savesPath))
+    .then((savesPath) => util.opn(savesPath))
     .catch((err) =>
       api.showErrorNotification("Failed to open savegame directory", err, {
         allowReport: (err as any).code !== "ENOENT",

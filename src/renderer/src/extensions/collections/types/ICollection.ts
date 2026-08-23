@@ -15,6 +15,8 @@ export interface ICollectionInfo {
   installInstructions: string;
   domainName: string;
   gameVersions?: string[];
+  offline?: boolean;
+  exportedAt?: string;
 }
 
 export type UpdatePolicy = "exact" | "latest" | "prefer";

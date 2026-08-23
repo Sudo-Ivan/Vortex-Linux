@@ -109,10 +109,16 @@ interface ICreateCollectionFromProfileResult {
   wantsToUpload: boolean;
 }
 
+export interface ICreateCollectionFromProfileOptions {
+  allMods?: boolean;
+  skipDialog?: boolean;
+}
+
 export async function createCollectionFromProfile(
   api: IExtensionApi,
   profileId: string,
   forceName?: string,
+  options?: ICreateCollectionFromProfileOptions,
 ): Promise<ICreateCollectionFromProfileResult> {
   const state: IState = api.store.getState();
   const profile = state.persistent.profiles[profileId];
@@ -126,7 +132,12 @@ export async function createCollectionFromProfile(
 
   const isNexusSourced = (m: IMod) => m?.attributes?.source === "nexus";
   const isGeneratedMod = (m: IMod) => m?.attributes?.generated === true;
-  const filterFunc = (m: IMod) => (forceName ? isNexusSourced(m) && !isGeneratedMod(m) : true);
+  const filterFunc = (m: IMod) => {
+    if (options?.allMods === true) {
+      return !isGeneratedMod(m);
+    }
+    return forceName ? isNexusSourced(m) && !isGeneratedMod(m) : true;
+  };
   const rules = createRulesFromProfile(
     profile,
     state.persistent.mods[profile.gameId] ?? {},
@@ -141,6 +152,11 @@ export async function createCollectionFromProfile(
   const uploadLabel = "Create and Upload";
   let wantsToUpload = false;
   if (mod === undefined) {
+    if (options?.skipDialog === true && forceName !== undefined) {
+      await createCollection(api, profile.gameId, id, forceName, rules);
+      await createTweaksFromProfile(api, profile, state.persistent.mods[profile.gameId] ?? {}, id);
+      return { id, name: forceName, updated: false, wantsToUpload: false };
+    }
     const t = api.translate;
     const result = await api.showDialog(
       "question",

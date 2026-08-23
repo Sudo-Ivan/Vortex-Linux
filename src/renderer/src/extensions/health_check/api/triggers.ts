@@ -7,7 +7,6 @@ import { HealthCheckTrigger } from "../../../types/IHealthCheck";
 import { hasCollectionActiveSession } from "../../../util/collectionInstallSessionSelectors";
 import Debouncer from "../../../util/Debouncer";
 import { isLoggedIn } from "../../nexus_integration/selectors";
-import { runAutoResolveDependencies } from "../utils/autoResolveDependencies";
 import type { IHealthCheckApi } from "../types";
 
 /**
@@ -164,8 +163,6 @@ async function triggerHealthChecks(
       errors: results.filter((r) => r.status === "error").length,
       failed: results.filter((r) => r.status === "failed").length,
     });
-
-    await runAutoResolveDependencies(api);
   } catch (error) {
     const err = unknownToError(error);
     log("error", "Failed to trigger health checks", {

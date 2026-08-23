@@ -35,6 +35,7 @@ import { installPathForGame } from "../../mod_management/selectors";
 import type { IMod, IModRule } from "../../mod_management/types/IMod";
 import { findModByRef } from "../../mod_management/util/findModByRef";
 import renderModName from "../../mod_management/util/modName";
+import { appendModReferenceTagsActions } from "../../mod_management/util/modReferenceTags";
 import testModReference, {
   isDependencyRule,
   isOptionalRule,
@@ -61,6 +62,7 @@ import {
 } from "./collectionInstallAnalytics";
 import { isGamebryoGame } from "./gameSupport";
 import InfoCache from "./InfoCache";
+import { isOfflineCollectionMod, readLocalCollectionManifest } from "./offlineCollection";
 import { readCollection } from "./readCollection";
 import { getUnfulfilledNotificationId } from "./util";
 
@@ -199,10 +201,19 @@ class InstallDriver {
       // installed collection member is stamped with its rule's referenceTag, and testModReference
       // treats an identical tag as authoritative, so a tag hit is a definitive O(1) match - this
       // is what keeps attribution from being O(members) per event (the 2000-4000 mod freeze).
-      const taggedDependent =
-        mod?.attributes?.referenceTag !== undefined
-          ? this.mDependentByTag.get(mod.attributes.referenceTag)
+      // a member mod carries a tag per collection that pulled it in, so any of them can name the
+      // rule this install belongs to
+      const attrs = mod?.attributes;
+      let taggedDependent =
+        attrs?.referenceTag !== undefined
+          ? this.mDependentByTag.get(attrs.referenceTag)
           : undefined;
+      for (const tag of attrs?.referenceTags ?? []) {
+        if (taggedDependent !== undefined) {
+          break;
+        }
+        taggedDependent = this.mDependentByTag.get(tag);
+      }
 
       // fallback for a mod with no (matching) referenceTag: match by reference / identifiers. The
       // identifiers are independent of the rule, so build them once rather than per member.
@@ -255,6 +266,9 @@ class InstallDriver {
           setModAttribute(gameId, modId, "installerChoices", installSpec.installerChoices),
           setModAttribute(gameId, modId, "patches", installSpec.patches),
           setModAttribute(gameId, modId, "fileList", installSpec.fileList),
+          // record this collection's tag for the member, keeping any tag another collection
+          // stamped, so each collection recognises the mod as one of its own
+          ...appendModReferenceTagsActions(gameId, modId, mod, [dependent.reference.tag]),
         ]);
 
         if (dependent.type === "requires") {
@@ -513,6 +527,10 @@ class InstallDriver {
     return this.mRevisionInfo;
   }
 
+  public get isOffline(): boolean {
+    return isOfflineCollectionMod(this.mApi.getState(), this.mCollection);
+  }
+
   public get installDone(): boolean {
     return this.mInstallDone;
   }
@@ -606,6 +624,18 @@ class InstallDriver {
 
   private async initCollectionInfo() {
     if (this.mCollection?.archiveId === undefined) {
+      return;
+    }
+    if (this.isOffline) {
+      const local = await readLocalCollectionManifest(this.mApi, this.mGameId, this.mCollection);
+      if (local !== undefined) {
+        this.mCollectionInfo = {
+          name: local.info.name,
+          summary: local.info.description,
+          description: local.info.description,
+          user: { name: local.info.author, memberId: undefined },
+        } as nexusApi.ICollection;
+      }
       return;
     }
     const slug = this.collectionSlug;
@@ -834,7 +864,7 @@ class InstallDriver {
     const slug = this.collectionSlug;
     const revisionId = this.revisionId;
 
-    if (revisionId !== undefined) {
+    if (!this.isOffline && revisionId !== undefined) {
       try {
         this.mRevisionInfo = Array.isArray(nexusInfo?.revisionInfo?.modFiles)
           ? nexusInfo.revisionInfo
@@ -851,7 +881,7 @@ class InstallDriver {
 
     const { userInfo } = state.persistent["nexus"] ?? {};
     // don't request a vote on own collection
-    if (this.mRevisionInfo?.collection?.user?.memberId !== userInfo?.userId) {
+    if (!this.isOffline && this.mRevisionInfo?.collection?.user?.memberId !== userInfo?.userId) {
       this.mApi.store.dispatch(setPendingVote(revisionId, slug, this.revisionNumber, Date.now()));
     }
 
@@ -861,7 +891,11 @@ class InstallDriver {
     const gameVersion = await currentgame.getInstalledVersion(discovery);
     const gvMatch = (gv) => gv.reference === gameVersion;
     const revGameVersions = this.mRevisionInfo?.gameVersions ?? [];
-    if ((revGameVersions.length ?? 0 !== 0) && revGameVersions.find(gvMatch) === undefined) {
+    if (
+      !this.isOffline &&
+      (revGameVersions.length ?? 0 !== 0) &&
+      revGameVersions.find(gvMatch) === undefined
+    ) {
       const choice = await this.mApi.showDialog(
         "question",
         "Game version mismatch",
@@ -937,6 +971,33 @@ class InstallDriver {
 
     // the session's per-rule mod info, keyed by rule id, reconstructed from reality
     const sessionModInfo = reconstructSessionMods({ rules: required, mods, downloads });
+
+    // Members already present at start are never queued and emit no install event, so this is
+    // where they get this collection's tag. Deliberately not marked installedAsDependency: the
+    // user may have installed them themselves. Collected per mod because several members can
+    // resolve to one mod, whose tags are written as a whole array.
+    const startTagsByMod = new Map<string, string[]>(); // modId -> tags of the rules it satisfies
+    for (const info of Object.values(sessionModInfo)) {
+      if (info.status !== "installed" || info.modId === undefined) {
+        continue;
+      }
+      const tag = info.rule.reference.tag;
+      if (tag === undefined) {
+        continue;
+      }
+      const tags = startTagsByMod.get(info.modId);
+      if (tags === undefined) {
+        startTagsByMod.set(info.modId, [tag]);
+      } else if (!tags.includes(tag)) {
+        tags.push(tag);
+      }
+    }
+    batchDispatch(
+      this.mApi.store,
+      Array.from(startTagsByMod).flatMap(([modId, tags]) =>
+        appendModReferenceTagsActions(this.mGameId, modId, mods[modId], tags),
+      ),
+    );
 
     // Dispatch start session action (omitting computed properties)
     this.mApi.store.dispatch(

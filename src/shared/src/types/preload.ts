@@ -136,6 +136,9 @@ export interface Shell {
 
   /** Opens the file using the default application for the file extension */
   openFile(filePath: string): void;
+
+  /** Reveals the file in its parent folder using the OS file manager */
+  showItemInFolder(filePath: string): void;
 }
 
 export interface Diag {

@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   FOMOD_NATIVE_SO,
   findNativeSoSource,
+  fixFomodNativeLinuxDist,
   fixFomodNativeLinuxPackage,
   listFomodNativeAddons,
 } from "./fix-fomod-native-linux.mjs";
@@ -69,6 +70,28 @@ describe("fixFomodNativeLinuxPackage", () => {
         ["--set-rpath", "$ORIGIN", addonPath],
         { stdio: "pipe" },
       );
+    } finally {
+      Object.defineProperty(process, "platform", { value: originalPlatform });
+    }
+  });
+
+  it("fixes packaged dist layout under node_modules", () => {
+    tempDir = mkdtempSync(path.join(os.tmpdir(), "fomod-dist-"));
+    const distDir = path.join(tempDir, "dist");
+    const packageRoot = path.join(distDir, "node_modules", "@nexusmods", "fomod-installer-native");
+    const releaseDir = path.join(packageRoot, "build", "Release");
+    const addonDir = path.join(packageRoot, "bin", "linux-x64-148");
+    mkdirSync(releaseDir, { recursive: true });
+    mkdirSync(addonDir, { recursive: true });
+    writeFileSync(path.join(releaseDir, FOMOD_NATIVE_SO), "shared-object");
+    writeFileSync(path.join(addonDir, "fomod-installer-native.node"), "addon");
+
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, "platform", { value: "linux" });
+
+    try {
+      const results = fixFomodNativeLinuxDist(distDir);
+      expect(results).toHaveLength(1);
     } finally {
       Object.defineProperty(process, "platform", { value: originalPlatform });
     }

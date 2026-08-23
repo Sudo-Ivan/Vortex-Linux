@@ -1,7 +1,8 @@
 import { type FileHandle as NodeFileHandle, access, open } from "node:fs/promises";
 import type { IncomingHttpHeaders } from "node:http";
 
-import { getErrorCode } from "@vortex/shared";
+import type { FileSystemErrorCode } from "@nexusmods/adaptor-api/fs";
+import { getErrorCode, unknownToError } from "@vortex/shared";
 import type {
   ByteRange,
   Chunk,
@@ -12,20 +13,18 @@ import type {
   RetryStrategy,
 } from "@vortex/shared/download";
 import { DownloadError } from "@vortex/shared/errors";
-import type { Got, Headers, ExtendOptions } from "got";
+import type { Got, Headers, Delays as GotTimeoutOptions, ExtendOptions } from "got";
 import got from "got";
 import type { RateLimiter } from "limiter";
 import PQueue from "p-queue";
 import type { CookieJar } from "tough-cookie";
 
-import { isCancellation } from "../transfer/cancellation";
-import { withRetry } from "../transfer/retry";
-import type { TimeoutOptions } from "../transfer/timeouts";
-import { createGotTimeoutOptions } from "../transfer/timeouts";
-import { toNetworkError } from "./errors";
+import { parseNodeError } from "../filesystem/parse-node-error";
+import { isCancellation, toNetworkError } from "./errors";
 import type { ProgressReporter } from "./progress";
 import type { NormalizedResource } from "./resolver";
 import { normalize } from "./resolver";
+import { sleep } from "./retry";
 
 export const defaultChunkConcurrency = 4;
 
@@ -35,7 +34,23 @@ export type Checkpoint = {
   completedRanges: ByteRange[];
 };
 
-export type { TimeoutOptions };
+export type TimeoutOptions = {
+  // TODO: use Temporal API
+  /** Timeout for DNS lookup (ms). */
+  lookup: number;
+
+  /** Timeout for DNS lookup + TCP connect + TLS handshake (ms). */
+  connect: number;
+
+  /** Timeout between received data packets before treating the connection as stalled (ms). */
+  stall: number;
+};
+
+function fsErrorMessage(verb: string, filePath: string, reason: FileSystemErrorCode): string {
+  return reason === "generic"
+    ? `Failed to ${verb} ${filePath}`
+    : `Failed to ${verb} ${filePath}: ${reason}`;
+}
 
 /** @internal */
 export async function download<T>(
@@ -135,16 +150,22 @@ export async function download<T>(
     const fd = await open(dest, flag);
     handle = { fd, path: dest };
   } catch (err) {
-    throw new DownloadError({ code: "fs-error", path: dest }, `Failed to open ${dest}`, err);
+    const { code: reason, isTransient } = parseNodeError(err);
+    throw new DownloadError(
+      { code: "fs-error", path: dest, reason, isTransient },
+      fsErrorMessage("open", dest, reason),
+      err,
+    );
   }
 
   if (checkpoint && probe.size) {
     try {
       await handle.fd.truncate(probe.size);
     } catch (err) {
+      const { code: reason, isTransient } = parseNodeError(err);
       throw new DownloadError(
-        { code: "fs-error", path: handle.path },
-        `Failed to truncate ${handle.path}`,
+        { code: "fs-error", path: handle.path, reason, isTransient },
+        fsErrorMessage("truncate", handle.path, reason),
         err,
       );
     }
@@ -351,6 +372,18 @@ function createGotStream(
   return stream;
 }
 
+function createGotTimeoutOptions(timeout?: TimeoutOptions): GotTimeoutOptions | undefined {
+  if (!timeout) return undefined;
+
+  return {
+    lookup: timeout.lookup,
+    connect: timeout.connect,
+    secureConnect: timeout.connect,
+    socket: timeout.stall,
+    response: timeout.stall,
+  };
+}
+
 async function consumeTokens(
   limiter: RateLimiter,
   bytes: number,
@@ -413,9 +446,10 @@ async function downloadStream(
         if (progress) progress.bytesWritten += result.bytesWritten;
         writePosition += result.bytesWritten;
       } catch (err) {
+        const { code: reason, isTransient } = parseNodeError(err);
         throw new DownloadError(
-          { code: "fs-error", path: handle.path },
-          `Failed to write to ${handle.path}`,
+          { code: "fs-error", path: handle.path, reason, isTransient },
+          fsErrorMessage("write to", handle.path, reason),
           err,
         );
       }
@@ -451,6 +485,32 @@ async function downloadChunk(
     rateLimiter: options.rateLimiter,
     abortSignal: options.abortSignal,
   });
+}
+
+/**
+ * Retry helper that re-invokes `fn` according to the given strategy.
+ * Cancellations are never retried. Uses abort-aware sleep so backoff
+ * delays are interrupted when the signal fires.
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  strategy?: RetryStrategy,
+  abortSignal?: AbortSignal,
+): Promise<T> {
+  if (!strategy) return await fn();
+
+  let attempt = 0;
+  while (true) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (isCancellation(err)) throw err;
+      attempt++;
+      const verdict = strategy({ attempt, error: unknownToError(err) });
+      if (!verdict.retry) throw err;
+      await sleep(verdict.delayMs, abortSignal);
+    }
+  }
 }
 
 function createHeaders(

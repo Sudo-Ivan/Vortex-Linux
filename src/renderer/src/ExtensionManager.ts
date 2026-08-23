@@ -1986,12 +1986,12 @@ class ExtensionManager {
     callback: (url: string, install: boolean) => void,
   ): Promise<boolean> => {
     log("info", "register protocol", { protocol });
-    this.mProtocolHandlers[protocol] = callback;
     const haveToRegister = await registerProtocolHandler({
       protocol,
       setAsDefault: def,
       userDataPath: this.commandLineUserData(),
     });
+    this.mProtocolHandlers[protocol] = callback;
     return haveToRegister;
   };
 
@@ -2009,7 +2009,6 @@ class ExtensionManager {
 
   private deregisterProtocol = async (protocol: string): Promise<void> => {
     log("info", "deregister protocol");
-    delete this.mProtocolHandlers[protocol];
     await deregisterProtocolHandler(protocol, this.commandLineUserData());
   };
 
@@ -3052,7 +3051,6 @@ class ExtensionManager {
       installer_fomod_shared: () => require("./extensions/installer_fomod_shared/index.ts"),
       installer_nested_fomod: () => require("./extensions/installer_nested_fomod/index.ts"),
       instructions_overlay: () => require("./extensions/instructions_overlay/index.ts"),
-      linux_system: () => require("./extensions/linux_system/index.ts"),
       mod_load_order: () => require("./extensions/mod_load_order/index.ts"),
       mod_management: () => require("./extensions/mod_management/index.ts"),
       move_activator: () => require("./extensions/move_activator/index.ts"),
@@ -3069,6 +3067,7 @@ class ExtensionManager {
       // first (cf. gameversion_management before gamemode_management).
       collections: () => require("./extensions/collections/index.ts"),
       recovery: () => require("./extensions/recovery/index.ts"),
+      screenshots: () => require("./extensions/screenshots/index.ts"),
       settings_application: () => require("./extensions/settings_application/index.ts"),
       settings_interface: () => require("./extensions/settings_interface/index.ts"),
       settings_metaserver: () => require("./extensions/settings_metaserver/index.ts"),

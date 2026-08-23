@@ -51,6 +51,9 @@ export function classifyErrorCode(err: unknown): string {
     return "unknown_error";
   }
   if (isErrorOfType(err, DownloadError)) {
+    if (err.payload?.code === "fs-error" && err.payload.reason !== undefined) {
+      return err.payload.reason.replace(/\s+/g, "_");
+    }
     return downloadCodeToken(err.payload?.code);
   }
   if (err.name && err.name !== "Error") {

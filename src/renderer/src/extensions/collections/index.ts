@@ -74,6 +74,11 @@ import { createCollection } from "./util/createCollection";
 import { genDefaultsAction } from "./util/defaults";
 import { addExtension } from "./util/extension";
 import InstallDriver from "./util/InstallDriver";
+import {
+  exportCollectionBackupInteractive,
+  exportOfflineModpackInteractive,
+  importOfflineModpackInteractive,
+} from "./util/offlineExport";
 import { readCollection } from "./util/readCollection";
 import { getActiveInstallSession } from "./util/selectors";
 import { makeCollectionId } from "./util/transformCollection";
@@ -565,7 +570,9 @@ function genAttributeExtractor(api: IExtensionApi) {
     const revisionId = modInfo.download?.modInfo?.nexus?.ids?.revisionId;
     const collectionSlug = modInfo.download?.modInfo?.nexus?.ids?.collectionSlug;
     const revisionNumber = modInfo.download?.modInfo?.nexus?.ids?.revisionNumber;
-    const referenceTag = modInfo.download?.modInfo?.referenceTag;
+    // the rule being installed names the tag for this collection's copy; the download may have been
+    // fetched by another collection and carry its tag first
+    const referenceTag = modInfo.modReference?.tag ?? modInfo.download?.modInfo?.referenceTag;
 
     const result: { [key: string]: any } = {
       collectionId,
@@ -1005,6 +1012,65 @@ function register(context: IExtensionContext, collectionsCB: ICallbackMap) {
       );
     },
     (profileIds: string[]) => profileCollectionExists(context.api, profileIds[0]),
+  );
+
+  context.registerAction(
+    "profile-actions",
+    160,
+    "export",
+    {},
+    "Export Offline Modpack",
+    () => {
+      exportOfflineModpackInteractive(context.api).catch((err: unknown) => {
+        if (err instanceof UserCanceled) {
+          return;
+        }
+        context.api.showErrorNotification("Failed to export offline modpack", unknownToError(err));
+      });
+    },
+    () => true,
+  );
+
+  context.registerAction(
+    "profile-actions",
+    161,
+    "import",
+    {},
+    "Import Modpack / Backup",
+    () => {
+      importOfflineModpackInteractive(context.api).catch((err: unknown) => {
+        if (err instanceof UserCanceled) {
+          return;
+        }
+        context.api.showErrorNotification("Failed to import modpack", unknownToError(err));
+      });
+    },
+    () => true,
+  );
+
+  context.registerAction(
+    "mods-action-icons",
+    310,
+    "export",
+    {},
+    "Export Collection Backup",
+    (modIds: string[]) => {
+      exportCollectionBackupInteractive(context.api, modIds[0]).catch((err: unknown) => {
+        if (err instanceof UserCanceled) {
+          return;
+        }
+        context.api.showErrorNotification(
+          "Failed to export collection backup",
+          unknownToError(err),
+        );
+      });
+    },
+    (modIds: string[]) => {
+      const state = context.api.getState();
+      const gameId = selectors.activeGameId(state);
+      const mod = state.persistent.mods[gameId]?.[modIds[0]];
+      return mod?.type === MOD_TYPE;
+    },
   );
 
   context.registerAction(
