@@ -1,3 +1,5 @@
+import * as path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { buildDefaultReadOnlyPaths, buildInstallerSandboxArgv } from "./sandboxPaths";
@@ -21,9 +23,15 @@ describe("sandboxPaths", () => {
   });
 
   it("includes runtime library paths", () => {
-    const paths = buildDefaultReadOnlyPaths("/opt/fomod/ModInstallerIPC.exe", "/tmp/work");
+    const exePath = "/opt/fomod/ModInstallerIPC.exe";
+    const workPath = "/tmp/work";
+    const paths = buildDefaultReadOnlyPaths(exePath, workPath);
     expect(paths).toEqual(
-      expect.arrayContaining(["/opt/fomod", "/tmp/work", "/usr/lib", "/lib", "/lib64"]),
+      expect.arrayContaining(
+        [path.dirname(exePath), workPath, "/lib", "/lib64", "/usr/lib"].map((entry) =>
+          path.resolve(entry),
+        ),
+      ),
     );
   });
 });
