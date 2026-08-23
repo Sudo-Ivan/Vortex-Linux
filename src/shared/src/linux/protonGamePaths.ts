@@ -5,6 +5,8 @@ export interface IProtonPathInference {
   steamAppsPath?: string;
 }
 
+const WINE_SYSTEM_USER_DIRS = new Set(["public", "default", "default user", "all users"]);
+
 function joinPosix(...parts: string[]): string {
   return parts
     .filter((part) => part.length > 0)
@@ -12,24 +14,84 @@ function joinPosix(...parts: string[]): string {
     .replace(/\/+/g, "/");
 }
 
-export function getWineDocumentsPath(winePrefixPath: string): string {
-  return joinPosix(winePrefixPath, "drive_c/users/steamuser/Documents");
+export function pickWineUserName(userEntries: string[]): string {
+  if (userEntries.includes("steamuser")) {
+    return "steamuser";
+  }
+
+  const candidate = userEntries.find((entry) => !WINE_SYSTEM_USER_DIRS.has(entry.toLowerCase()));
+  return candidate ?? "steamuser";
 }
 
-export function getWineAppDataLocalPath(winePrefixPath: string): string {
-  return joinPosix(winePrefixPath, "drive_c/users/steamuser/AppData/Local");
+export function listCandidateWineUsers(userEntries: string[]): string[] {
+  const ordered: string[] = [];
+  const add = (user: string) => {
+    if (!ordered.includes(user)) {
+      ordered.push(user);
+    }
+  };
+
+  add(pickWineUserName(userEntries));
+  if (userEntries.includes("steamuser")) {
+    add("steamuser");
+  }
+
+  for (const entry of userEntries) {
+    if (!WINE_SYSTEM_USER_DIRS.has(entry.toLowerCase())) {
+      add(entry);
+    }
+  }
+
+  return ordered;
 }
 
-export function getWineAppDataRoamingPath(winePrefixPath: string): string {
-  return joinPosix(winePrefixPath, "drive_c/users/steamuser/AppData/Roaming");
+export function getWineUserDir(winePrefixPath: string, wineUser = "steamuser"): string {
+  return joinPosix(winePrefixPath, "drive_c/users", wineUser);
+}
+
+export function getWineDocumentsPath(winePrefixPath: string, wineUser = "steamuser"): string {
+  return joinPosix(getWineUserDir(winePrefixPath, wineUser), "Documents");
+}
+
+export function getWineAppDataLocalPath(winePrefixPath: string, wineUser = "steamuser"): string {
+  return joinPosix(getWineUserDir(winePrefixPath, wineUser), "AppData/Local");
+}
+
+export function getWineAppDataRoamingPath(winePrefixPath: string, wineUser = "steamuser"): string {
+  return joinPosix(getWineUserDir(winePrefixPath, wineUser), "AppData/Roaming");
+}
+
+export function resolveWineAppDataLocalGamePath(
+  winePrefixPath: string,
+  appDataFolder: string,
+  userEntries: string[] | undefined,
+  pathExists: (target: string) => boolean,
+): string | undefined {
+  const users =
+    userEntries !== undefined && userEntries.length > 0
+      ? listCandidateWineUsers(userEntries)
+      : ["steamuser"];
+
+  for (const user of users) {
+    const candidate = buildAppDataLocalGamePath(winePrefixPath, appDataFolder, user);
+    if (pathExists(candidate)) {
+      return candidate;
+    }
+  }
+
+  return undefined;
 }
 
 export function buildMyGamesPath(documentsPath: string, gameFolderName: string): string {
   return joinPosix(documentsPath, "My Games", gameFolderName);
 }
 
-export function buildAppDataLocalGamePath(winePrefixPath: string, appDataFolder: string): string {
-  return joinPosix(getWineAppDataLocalPath(winePrefixPath), appDataFolder);
+export function buildAppDataLocalGamePath(
+  winePrefixPath: string,
+  appDataFolder: string,
+  wineUser = "steamuser",
+): string {
+  return joinPosix(getWineAppDataLocalPath(winePrefixPath, wineUser), appDataFolder);
 }
 
 export function inferSteamAppsPathFromGamePath(gamePath: string): string | undefined {

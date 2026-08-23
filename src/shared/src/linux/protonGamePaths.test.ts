@@ -7,6 +7,7 @@ import {
   inferProtonPathsFromGamePath,
   inferSteamAppsPathFromGamePath,
   myGamesFolderCaseVariants,
+  pickWineUserName,
 } from "./protonGamePaths";
 
 describe("protonGamePaths", () => {
@@ -37,5 +38,13 @@ describe("protonGamePaths", () => {
     expect(myGamesFolderCaseVariants("skyrim")).toEqual(
       expect.arrayContaining(["skyrim", "Skyrim", "SKYRIM"]),
     );
+  });
+
+  it("prefers steamuser when present in a prefix", () => {
+    expect(pickWineUserName(["Public", "steamuser", "heroic"])).toBe("steamuser");
+  });
+
+  it("falls back to the first non-system wine user", () => {
+    expect(pickWineUserName(["Public", "heroic", "Default"])).toBe("heroic");
   });
 });

@@ -1,6 +1,8 @@
+import * as fs from "node:fs";
 import * as path from "path";
 
 import format from "string-template";
+import { getWineDocumentsPath, pickWineUserName } from "@vortex/shared/linux";
 
 import getVortexPath from "../../util/getVortexPath";
 import { makeOverlayableDictionary } from "../../util/util";
@@ -172,10 +174,20 @@ const gameSupport = makeOverlayableDictionary<string, IGameSupport>(
   (gameId: string, store: string) => store,
 );
 
+function wineDocumentsPath(winePrefixPath: string): string {
+  const usersDir = path.join(winePrefixPath, "drive_c", "users");
+  try {
+    const users = fs.readdirSync(usersDir);
+    return getWineDocumentsPath(winePrefixPath, pickWineUserName(users));
+  } catch {
+    return getWineDocumentsPath(winePrefixPath);
+  }
+}
+
 export function iniFiles(gameMode: string, discovery: IDiscoveryResult) {
   const documentsPath =
     discovery?.winePrefixPath !== undefined
-      ? path.join(discovery.winePrefixPath, "drive_c", "users", "steamuser", "Documents")
+      ? wineDocumentsPath(discovery.winePrefixPath)
       : getVortexPath("documents");
   const mygames = path.join(documentsPath, "My Games");
 

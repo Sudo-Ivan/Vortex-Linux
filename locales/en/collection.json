@@ -19,6 +19,24 @@
       "title": "Mod browsing is coming soon",
       "description": "You'll soon be able to browse mods directly in Vortex. Until then, visit Nexus Mods to discover and download mods.",
       "openWebsite": "Open Nexus Mods Website"
+    },
+    "mods": {
+      "feed": {
+        "latest": "Recently added",
+        "trending": "Trending"
+      },
+      "resultsCount": "{{total}} mods",
+      "endorsements": "{{total}} endorsements",
+      "downloads": "{{total}} downloads",
+      "viewOnSite": "View on Nexus Mods",
+      "loginPrompt": "Log in to your Nexus Mods account to browse mods and start downloads from Vortex.",
+      "login": "Log in",
+      "premiumPrompt": "Premium members get faster direct downloads and one-click installs from the site.",
+      "goPremium": "Go Premium",
+      "noResults": {
+        "title": "No mods available",
+        "message": "Try again later or browse mods on the Nexus Mods website."
+      }
     }
   },
   "pagination": {

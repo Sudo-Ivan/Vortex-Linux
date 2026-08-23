@@ -1,6 +1,8 @@
+import * as fs from "node:fs";
 import * as path from "path";
 
 import { selectors, types, util } from "@nexusmods/vortex-api";
+import { getWineDocumentsPath, pickWineUserName } from "@vortex/shared/linux";
 import * as Redux from "redux";
 
 export interface ISettingsFile {
@@ -140,11 +142,21 @@ export function gameSupported(gameMode: string): boolean {
   return gameSupport.has(gameMode);
 }
 
+function wineDocumentsPath(winePrefixPath: string): string {
+  const usersDir = path.join(winePrefixPath, "drive_c", "users");
+  try {
+    const users = fs.readdirSync(usersDir);
+    return getWineDocumentsPath(winePrefixPath, pickWineUserName(users));
+  } catch {
+    return getWineDocumentsPath(winePrefixPath);
+  }
+}
+
 export function mygamesPath(gameMode: string): string {
   const discovery = discoveryForGame(gameMode);
   const documentsPath =
     discovery?.winePrefixPath !== undefined
-      ? path.join(discovery.winePrefixPath, "drive_c", "users", "steamuser", "Documents")
+      ? wineDocumentsPath(discovery.winePrefixPath)
       : util.getVortexPath("documents");
   return path.join(documentsPath, "My Games", gameSupport.get(gameMode, "mygamesPath"));
 }

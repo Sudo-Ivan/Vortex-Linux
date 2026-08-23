@@ -1,7 +1,7 @@
 import * as path from "path";
 
 import { types, util } from "@nexusmods/vortex-api";
-import { inferProtonPathsFromGamePath, myGamesFolderCaseVariants } from "@vortex/shared/linux";
+import { getWineDocumentsPath, inferProtonPathsFromGamePath, myGamesFolderCaseVariants, pickWineUserName } from "@vortex/shared/linux";
 
 type Discovery = types.IDiscoveryResult & { winePrefixPath?: string };
 
@@ -21,9 +21,22 @@ export function getCachedMyGamesRoot(gameId: string): string | undefined {
 
 export function documentsPathForSaves(discovery: Discovery | undefined): string {
   if (discovery?.winePrefixPath !== undefined) {
-    return path.join(discovery.winePrefixPath, "drive_c", "users", "steamuser", "Documents");
+    return getWineDocumentsPath(discovery.winePrefixPath);
   }
   return util.getVortexPath("documents");
+}
+
+async function resolveDocumentsPathForPrefix(
+  winePrefixPath: string,
+  readdirAsync: (p: string) => Promise<string[]>,
+): Promise<string> {
+  const usersDir = path.join(winePrefixPath, "drive_c", "users");
+  try {
+    const users = await readdirAsync(usersDir);
+    return getWineDocumentsPath(winePrefixPath, pickWineUserName(users));
+  } catch {
+    return getWineDocumentsPath(winePrefixPath);
+  }
 }
 
 export function syncMyGamesPath(
@@ -95,7 +108,10 @@ export async function resolveMyGamesRoot(
 
   const discoveryWithPrefix =
     winePrefixPath !== undefined ? { ...discovery, winePrefixPath } : discovery;
-  const documentsPath = documentsPathForSaves(discoveryWithPrefix);
+  const documentsPath =
+    winePrefixPath !== undefined
+      ? await resolveDocumentsPathForPrefix(winePrefixPath, fsApi.readdirAsync)
+      : documentsPathForSaves(discoveryWithPrefix);
   const myGamesParent = path.join(documentsPath, "My Games");
 
   const resolvedFolder = await resolveExistingChildDir(

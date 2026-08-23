@@ -1,4 +1,4 @@
-import { mdiClockOutline, mdiMagnify, mdiOpenInNew, mdiRefresh } from "@mdi/js";
+import { mdiMagnify, mdiOpenInNew, mdiRefresh } from "@mdi/js";
 import type {
   ICollection,
   ICollectionSearchOptions,
@@ -31,6 +31,8 @@ import { Typography } from "@/ui/components/typography/Typography";
 import { UserCanceled } from "@/util/api";
 import { activeGameId } from "@/util/selectors";
 import MainPage from "@/views/MainPage";
+
+import { ModBrowsePanel } from "./ModBrowsePanel";
 
 interface IBrowseNexusPageProps {
   api: IExtensionApi;
@@ -383,23 +385,7 @@ function BrowseNexusPage(props: IBrowseNexusPageProps) {
           </TabPanel>
 
           <TabPanel id="mods">
-            <NoResults
-              className="py-16"
-              iconPath={mdiClockOutline}
-              message={t("collection:browse.modsComingSoon.description")}
-              title={t("collection:browse.modsComingSoon.title")}
-            >
-              <Button
-                appearance="moderate"
-                brand="neutral"
-                leftIconPath={mdiOpenInNew}
-                onClick={() =>
-                  window.api.shell.openUrl(`https://www.nexusmods.com/games/${gameDomainName}/mods`)
-                }
-              >
-                {t("collection:browse.modsComingSoon.openWebsite")}
-              </Button>
-            </NoResults>
+            <ModBrowsePanel api={api} gameId={gameId} t={t} />
           </TabPanel>
         </TabProvider>
       </MainPage.Body>

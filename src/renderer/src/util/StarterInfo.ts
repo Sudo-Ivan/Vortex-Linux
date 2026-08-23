@@ -116,6 +116,34 @@ async function resolveCompatibilityLaunchContext(
     };
   }
 
+  if (info.store !== "steam" && discovery?.path !== undefined) {
+    try {
+      const game = getGame(info.gameId);
+      const compat = await window.api.linux.discoverCompatibility({
+        gamePath: discovery.path,
+        steamAppId: game.details?.steamAppId,
+        heroicAppName: discovery.heroicAppName,
+      });
+      const heroic = compat.heroicMatch;
+      if (heroic?.winePrefix !== undefined && heroic.runnerPath !== undefined) {
+        const runnerType = heroic.runnerType ?? "proton";
+        const runnerPath =
+          runnerType === "proton" ? path.dirname(heroic.runnerPath) : heroic.runnerPath;
+        return {
+          runnerType,
+          runnerPath,
+          winePrefixPath: heroic.winePrefix,
+          compatDataPath: heroic.winePrefix,
+          steamPath,
+        };
+      }
+    } catch (err: any) {
+      log("debug", "Could not resolve Heroic compatibility layer for launch", {
+        error: err?.message,
+      });
+    }
+  }
+
   if (info.store !== "steam") {
     return undefined;
   }

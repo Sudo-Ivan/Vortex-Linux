@@ -2,7 +2,7 @@ import * as nodeFs from "node:fs";
 import * as path from "path";
 
 import { fs, log, selectors, types, util } from "@nexusmods/vortex-api";
-import { buildAppDataLocalGamePath } from "@vortex/shared/linux";
+import { buildAppDataLocalGamePath, resolveWineAppDataLocalGamePath } from "@vortex/shared/linux";
 import Promise from "bluebird";
 import memoizeOne from "memoize-one";
 
@@ -373,9 +373,27 @@ export function appDataPath(gameMode: string): string {
     winePrefixPath?: string;
   };
   if (discovery?.winePrefixPath !== undefined) {
-    const protonPath = buildAppDataLocalGamePath(discovery.winePrefixPath, dataPath);
-    if (nodeFs.existsSync(protonPath)) {
+    const usersDir = path.join(discovery.winePrefixPath, "drive_c", "users");
+    let userEntries: string[] | undefined;
+    try {
+      userEntries = nodeFs.readdirSync(usersDir);
+    } catch {
+      userEntries = undefined;
+    }
+
+    const protonPath = resolveWineAppDataLocalGamePath(
+      discovery.winePrefixPath,
+      dataPath,
+      userEntries,
+      (target) => nodeFs.existsSync(target),
+    );
+    if (protonPath !== undefined) {
       return protonPath;
+    }
+
+    const fallbackPath = buildAppDataLocalGamePath(discovery.winePrefixPath, dataPath);
+    if (nodeFs.existsSync(fallbackPath)) {
+      return fallbackPath;
     }
   }
 
