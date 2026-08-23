@@ -1986,12 +1986,12 @@ class ExtensionManager {
     callback: (url: string, install: boolean) => void,
   ): Promise<boolean> => {
     log("info", "register protocol", { protocol });
+    this.mProtocolHandlers[protocol] = callback;
     const haveToRegister = await registerProtocolHandler({
       protocol,
       setAsDefault: def,
       userDataPath: this.commandLineUserData(),
     });
-    this.mProtocolHandlers[protocol] = callback;
     return haveToRegister;
   };
 
@@ -2009,6 +2009,7 @@ class ExtensionManager {
 
   private deregisterProtocol = async (protocol: string): Promise<void> => {
     log("info", "deregister protocol");
+    delete this.mProtocolHandlers[protocol];
     await deregisterProtocolHandler(protocol, this.commandLineUserData());
   };
 

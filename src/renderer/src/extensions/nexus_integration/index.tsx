@@ -940,7 +940,7 @@ function extendAPI(api: IExtensionApi, nexus: NexusT): INexusAPIExtension {
   };
 }
 
-function once(api: IExtensionApi, callbacks: Array<(nexus: NexusT) => void>) {
+async function once(api: IExtensionApi, callbacks: Array<(nexus: NexusT) => void>) {
   const registerFunc = async (def?: boolean) => {
     if (def === undefined) {
       api.store.dispatch(setAssociatedWithNXMURLs(true));
@@ -1062,7 +1062,7 @@ function once(api: IExtensionApi, callbacks: Array<(nexus: NexusT) => void>) {
       }
     }
 
-    registerFunc(getSafe(state, ["settings", "nexus", "associateNXM"], undefined));
+    await registerFunc(getSafe(state, ["settings", "nexus", "associateNXM"], undefined));
 
     api.registerRepositoryLookup("nexus", true, makeRepositoryLookup(api, nexus));
 

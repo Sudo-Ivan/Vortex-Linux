@@ -721,9 +721,8 @@ async function init(): Promise<ExtensionManager | null> {
       store.dispatch(
         addNotification({
           type: "info",
-          message: tFunc("Vortex isn't set up to handle this protocol: {{url}}", {
-            replace: { url },
-          }),
+          message: "Vortex isn't set up to handle this protocol: {{url}}",
+          replace: { url },
         }),
       );
     }
