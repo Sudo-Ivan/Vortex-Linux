@@ -2642,6 +2642,9 @@ importers:
       '@vortex/extension-test-mocks':
         specifier: workspace:*
         version: link:../../packages/extension-test-mocks
+      '@vortex/shared':
+        specifier: workspace:*
+        version: link:../../src/shared
       bluebird:
         specifier: 'catalog:'
         version: 3.7.2
