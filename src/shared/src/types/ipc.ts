@@ -94,6 +94,47 @@ export interface ProtonSnapshotContext {
   winePrefixPath: string;
 }
 
+export type CompatibilityRunnerType = "proton" | "wine";
+
+export type WinePrefixSource = "steam" | "heroic" | "custom";
+
+export interface CompatibilityRunner {
+  id: string;
+  name: string;
+  type: CompatibilityRunnerType;
+  path: string;
+}
+
+export interface WinePrefixOption {
+  id: string;
+  label: string;
+  path: string;
+  source: WinePrefixSource;
+}
+
+export interface HeroicGameMatch {
+  appName: string;
+  installPath: string;
+  winePrefix?: string;
+  runnerPath?: string;
+  runnerName?: string;
+  runnerType?: CompatibilityRunnerType;
+  store: "gog" | "epic" | "legendary" | "nile" | "sideload";
+}
+
+export interface CompatibilityDiscoveryQuery {
+  gamePath?: string;
+  steamAppId?: string | number;
+  heroicAppName?: string;
+}
+
+export interface CompatibilityDiscoveryResult {
+  runners: CompatibilityRunner[];
+  prefixes: WinePrefixOption[];
+  heroicMatch?: HeroicGameMatch;
+  steamPath?: string;
+}
+
 /** Vortex application paths */
 export type VortexPaths = {
   base: string;
@@ -375,6 +416,9 @@ export interface InvokeChannels {
   "linux:get-system-health": () => Promise<LinuxSystemHealthReport>;
   "linux:repair-desktop-integration": () => Promise<LinuxDesktopRepairResult>;
   "linux:supports-installer-sandbox": () => Promise<boolean>;
+  "linux:discover-compatibility": (
+    query: CompatibilityDiscoveryQuery,
+  ) => Promise<CompatibilityDiscoveryResult>;
   // Dialog channels
   "dialog:showOpen": (options: OpenDialogOptions) => Promise<OpenDialogReturnValue>;
   "dialog:showSave": (options: SaveDialogOptions) => Promise<SaveDialogReturnValue>;

@@ -11,6 +11,7 @@ import type { IDiscoveryResult } from "../extensions/gamemode_management/types/I
 import type { IGameStored } from "../extensions/gamemode_management/types/IGameStored";
 import type { IToolStored } from "../extensions/gamemode_management/types/IToolStored";
 import { getGame } from "../extensions/gamemode_management/util/getGame";
+import { compatibilitySettingsFromDiscovery } from "../extensions/linux_system/CompatibilitySettings";
 import { log } from "../logging";
 import type { IDiscoveredTool } from "../types/IDiscoveredTool";
 import type { IExtensionApi } from "../types/IExtensionContext";
@@ -26,8 +27,17 @@ import {
 import { emitGameLaunched, recordLaunchExit } from "./gameLaunchAnalytics";
 import GameStoreHelper from "./GameStoreHelper";
 import getVortexPath from "./getVortexPath";
-import { isWindowsExecutable } from "./linux/proton";
-import type { Steam, ISteamEntry } from "./Steam";
+import {
+  buildProtonCommand,
+  buildProtonEnvironment,
+  buildWineCommand,
+  buildWineEnvironment,
+  compatibilityContextFromDiscovery,
+  type ICompatibilityLaunchContext,
+  isWindowsExecutable,
+} from "./linux/proton";
+import { findLinuxSteamPath } from "./linux/steamPaths";
+import type { Steam } from "./Steam";
 import { getSafe } from "./storeHelper";
 
 async function hideWindow(): Promise<void> {
@@ -70,23 +80,42 @@ type OnShowErrorFunc = (
 ) => void;
 
 /**
- * Check if a game or tool should run through Proton on Linux.
- * Returns the matching Steam game entry if Proton should be used, undefined otherwise.
- *
- * This enables running Windows executables directly through Proton rather than
- * via `steam -applaunch`, allowing custom command-line arguments and running
- * different executables (like mod tools) with the game's Proton prefix.
+ * Check if a game or tool should run through Proton or Wine on Linux.
+ * Returns a launch context when a compatibility layer is configured or detected.
  */
-async function shouldRunWithProton(
+async function resolveCompatibilityLaunchContext(
   info: IStarterInfo,
   api: IExtensionApi,
-): Promise<ISteamEntry | undefined> {
+): Promise<ICompatibilityLaunchContext | undefined> {
   if (process.platform === "win32") {
     return undefined;
   }
   if (!isWindowsExecutable(info.exePath)) {
     return undefined;
   }
+
+  const discovery = api.store.getState().settings.gameMode.discovered[info.gameId];
+  const steamPath = findLinuxSteamPath();
+  const discoveryContext = compatibilityContextFromDiscovery(discovery ?? {}, steamPath);
+  if (discoveryContext !== undefined) {
+    return discoveryContext;
+  }
+
+  const configured = compatibilitySettingsFromDiscovery(discovery);
+  if (
+    configured.runnerType !== undefined &&
+    configured.runnerPath !== undefined &&
+    configured.winePrefixPath !== undefined
+  ) {
+    return {
+      runnerType: configured.runnerType,
+      runnerPath: configured.runnerPath,
+      winePrefixPath: configured.winePrefixPath,
+      compatDataPath: configured.compatDataPath,
+      steamPath,
+    };
+  }
+
   if (info.store !== "steam") {
     return undefined;
   }
@@ -94,19 +123,84 @@ async function shouldRunWithProton(
   try {
     const steamStore = GameStoreHelper.getGameStore("steam") as Steam;
     const games = await steamStore.allGames();
-
-    // Find the game entry that matches this executable's location
-    return games.find(
+    const gameEntry = games.find(
       (g) =>
         info.workingDirectory?.toLowerCase().startsWith(g.gamePath.toLowerCase()) ||
         info.exePath.toLowerCase().startsWith(g.gamePath.toLowerCase()),
     );
+
+    if (
+      gameEntry?.usesProton !== true ||
+      gameEntry.protonPath === undefined ||
+      gameEntry.compatDataPath === undefined
+    ) {
+      return undefined;
+    }
+
+    return {
+      runnerType: "proton",
+      runnerPath: gameEntry.protonPath,
+      winePrefixPath: path.join(gameEntry.compatDataPath, "pfx"),
+      compatDataPath: gameEntry.compatDataPath,
+      steamPath,
+    };
   } catch (err: any) {
-    log("debug", "Could not check for Proton execution", {
+    log("debug", "Could not check for compatibility layer execution", {
       error: err?.message,
     });
     return undefined;
   }
+}
+
+async function runWithCompatibilityLayer(
+  api: IExtensionApi,
+  info: IStarterInfo,
+  context: ICompatibilityLaunchContext,
+  onSpawned: () => void,
+): Promise<void> {
+  const steamPath = context.steamPath ?? findLinuxSteamPath();
+  if (steamPath === undefined) {
+    throw new Error("Steam installation is required to run Proton");
+  }
+
+  if (context.runnerType === "wine") {
+    const { executable, args } = buildWineCommand(
+      context.runnerPath,
+      info.exePath,
+      info.commandLine,
+    );
+    const env = buildWineEnvironment(context.winePrefixPath, info.environment);
+    return api.runExecutable(executable, args, {
+      cwd: info.workingDirectory || path.dirname(info.exePath),
+      env,
+      suggestDeploy: true,
+      shell: false,
+      detach: info.detach || info.onStart === "close",
+      onSpawned,
+    });
+  }
+
+  const compatDataPath = context.compatDataPath ?? context.winePrefixPath;
+  const { executable, args } = buildProtonCommand(
+    context.runnerPath,
+    info.exePath,
+    info.commandLine,
+  );
+  const env = buildProtonEnvironment(
+    compatDataPath,
+    steamPath,
+    info.environment,
+    context.winePrefixPath,
+  );
+
+  return api.runExecutable(executable, args, {
+    cwd: info.workingDirectory || path.dirname(info.exePath),
+    env,
+    suggestDeploy: true,
+    shell: false,
+    detach: info.detach || info.onStart === "close",
+    onSpawned,
+  });
 }
 
 /**
@@ -257,11 +351,9 @@ class StarterInfo implements IStarterInfo {
     };
 
     // Check if game/tool should run through Proton on Linux
-    const protonGameEntry = await shouldRunWithProton(info, api);
-    if (protonGameEntry?.usesProton) {
-      // On Linux with Proton, we can't track when the process exits (ProcessMonitor
-      // only works on Windows), so don't set tool as running to avoid stuck spinner
-      const protonSpawned = () => {
+    const compatibilityContext = await resolveCompatibilityLaunchContext(info, api);
+    if (compatibilityContext !== undefined) {
+      const compatibilitySpawned = () => {
         if (["hide", "hide_recover"].includes(info.onStart)) {
           hideWindow();
         } else if (info.onStart === "close") {
@@ -269,21 +361,7 @@ class StarterInfo implements IStarterInfo {
         }
       };
 
-      const steamStore = GameStoreHelper.getGameStore("steam") as Steam;
-      return steamStore.runToolWithProton(
-        api,
-        info.exePath,
-        info.commandLine,
-        {
-          cwd: info.workingDirectory || path.dirname(info.exePath),
-          env: info.environment,
-          suggestDeploy: true,
-          shell: info.shell,
-          detach: info.detach || info.onStart === "close",
-          onSpawned: protonSpawned,
-        },
-        protonGameEntry,
-      );
+      return runWithCompatibilityLayer(api, info, compatibilityContext, compatibilitySpawned);
     }
 
     return api

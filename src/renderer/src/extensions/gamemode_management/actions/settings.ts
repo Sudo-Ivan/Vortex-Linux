@@ -71,6 +71,24 @@ export const setGameHidden = createAction("SET_GAME_HIDDEN", (gameId: string, hi
 
 export const setGameSearchPaths = createAction("SET_GAME_SEARCH_PATHS", (paths: string[]) => paths);
 
+export const setGameCompatibility = createAction(
+  "SET_GAME_COMPATIBILITY",
+  (
+    gameId: string,
+    compatibility: Pick<
+      IDiscoveryResult,
+      | "usesProton"
+      | "winePrefixPath"
+      | "protonPath"
+      | "compatDataPath"
+      | "compatibilityRunnerId"
+      | "compatibilityRunnerType"
+      | "heroicAppName"
+      | "winePrefixId"
+    >,
+  ) => ({ gameId, compatibility }),
+);
+
 export const setPickerLayout = createAction(
   "SET_GAMEPICKER_LAYOUT",
   (layout: "list" | "small" | "large") => ({ layout }),

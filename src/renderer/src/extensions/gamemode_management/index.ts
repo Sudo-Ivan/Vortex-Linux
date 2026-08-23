@@ -58,7 +58,7 @@ import { currentGame, currentGameDiscovery, discoveryByGame, gameById } from "./
 import type { IDiscoveryResult } from "./types/IDiscoveryResult";
 import type { IGameStored } from "./types/IGameStored";
 import type { IModType } from "./types/IModType";
-import { enrichManualDiscoveryWithProton } from "./util/discovery";
+import { enrichDiscoveryWithCompatibility } from "./util/discovery";
 import getDriveList from "./util/getDriveList";
 import { getGame, getGameStore, getGameStores } from "./util/getGame";
 import { getModType, getModTypeExtensions, registerModType } from "./util/modTypeExtensions";
@@ -313,7 +313,7 @@ function browseGameLocation(api: IExtensionApi, gameId: string): PromiseBB<void>
             return manualGameStoreSelection(api, corrected);
           })
           .then(({ corrected, store }) =>
-            enrichManualDiscoveryWithProton(game, {
+            enrichDiscoveryWithCompatibility(game, {
               path: corrected,
               tools: {},
               hidden: false,
@@ -329,14 +329,18 @@ function browseGameLocation(api: IExtensionApi, gameId: string): PromiseBB<void>
               discoveryResult.executable = executable;
               if (defaultPath !== undefined) {
                 api.store.dispatch(setGamePath(game.id, corrected, store, executable));
-                if (discoveryResult.winePrefixPath !== undefined) {
-                  api.store.dispatch(
-                    addDiscoveredGame(game.id, {
-                      usesProton: discoveryResult.usesProton,
-                      winePrefixPath: discoveryResult.winePrefixPath,
-                    }),
-                  );
-                }
+                api.store.dispatch(
+                  addDiscoveredGame(game.id, {
+                    usesProton: discoveryResult.usesProton,
+                    winePrefixPath: discoveryResult.winePrefixPath,
+                    protonPath: discoveryResult.protonPath,
+                    compatDataPath: discoveryResult.compatDataPath,
+                    compatibilityRunnerId: discoveryResult.compatibilityRunnerId,
+                    compatibilityRunnerType: discoveryResult.compatibilityRunnerType,
+                    heroicAppName: discoveryResult.heroicAppName,
+                    winePrefixId: discoveryResult.winePrefixId,
+                  }),
+                );
               } else {
                 api.store.dispatch(addDiscoveredGame(game.id, discoveryResult));
               }

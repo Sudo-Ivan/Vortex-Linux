@@ -1,5 +1,7 @@
 import * as path from "path";
 
+import type { CompatibilityRunnerType } from "@vortex/shared/linux";
+import { parseRunnerId } from "@vortex/shared/linux";
 import { parse } from "simple-vdf";
 
 import * as fs from "../fs";
@@ -235,6 +237,7 @@ export function buildProtonEnvironment(
   compatDataPath: string,
   steamPath: string,
   existingEnv?: Record<string, string>,
+  winePrefixPath?: string,
 ): Record<string, string> {
   const overlayLibraries = [
     path.join(steamPath, "ubuntu12_32", "gameoverlayrenderer.so"),
@@ -249,7 +252,7 @@ export function buildProtonEnvironment(
     ...existingEnv,
     STEAM_COMPAT_DATA_PATH: compatDataPath,
     STEAM_COMPAT_CLIENT_INSTALL_PATH: steamPath,
-    WINEPREFIX: getWinePrefixPath(compatDataPath),
+    WINEPREFIX: winePrefixPath ?? getWinePrefixPath(compatDataPath),
     LD_PRELOAD: ldPreload,
   };
 }
@@ -265,5 +268,68 @@ export function buildProtonCommand(
   return {
     executable: path.join(protonPath, "proton"),
     args: ["run", exePath, ...args],
+  };
+}
+
+export interface ICompatibilityLaunchContext {
+  runnerType: CompatibilityRunnerType;
+  runnerPath: string;
+  winePrefixPath: string;
+  compatDataPath?: string;
+  steamPath?: string;
+}
+
+export function buildWineEnvironment(
+  winePrefixPath: string,
+  existingEnv?: Record<string, string>,
+): Record<string, string> {
+  return {
+    ...existingEnv,
+    WINEPREFIX: winePrefixPath,
+  };
+}
+
+export function buildWineCommand(
+  winePath: string,
+  exePath: string,
+  args: string[],
+): { executable: string; args: string[] } {
+  return {
+    executable: winePath,
+    args: [exePath, ...args],
+  };
+}
+
+export function compatibilityContextFromDiscovery(
+  discovery: {
+    compatibilityRunnerId?: string;
+    compatibilityRunnerType?: CompatibilityRunnerType;
+    protonPath?: string;
+    winePrefixPath?: string;
+    compatDataPath?: string;
+    winePrefixId?: string;
+  },
+  steamPath?: string,
+): ICompatibilityLaunchContext | undefined {
+  const parsedRunner = parseRunnerId(discovery.compatibilityRunnerId);
+  const runnerType = discovery.compatibilityRunnerType ?? parsedRunner?.type;
+  const runnerPath = parsedRunner?.path ?? discovery.protonPath;
+  const winePrefixPath = discovery.winePrefixPath;
+
+  if (
+    runnerType === undefined ||
+    runnerPath === undefined ||
+    winePrefixPath === undefined ||
+    winePrefixPath.length === 0
+  ) {
+    return undefined;
+  }
+
+  return {
+    runnerType,
+    runnerPath,
+    winePrefixPath,
+    compatDataPath: discovery.compatDataPath ?? winePrefixPath,
+    steamPath,
   };
 }

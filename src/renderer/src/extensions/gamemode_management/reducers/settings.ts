@@ -103,6 +103,10 @@ export const settingsReducer: IReducerSpec<ISettingsGameMode> = {
       state.discovered[payload.gameId] === undefined
         ? state
         : merge(state, ["discovered", payload.gameId], payload.parameters),
+    [actions.setGameCompatibility as any]: (state, payload) =>
+      state.discovered[payload.gameId] === undefined
+        ? state
+        : merge(state, ["discovered", payload.gameId], payload.compatibility),
     [actions.setGameHidden as any]: (state, payload) =>
       setSafe(state, ["discovered", payload.gameId, "hidden"], payload.hidden),
     [actions.setGameSearchPaths as any]: (state, payload) =>

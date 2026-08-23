@@ -1,6 +1,7 @@
 import * as path from "path";
 
 import { getErrorCode, getErrorMessageOrDefault, unknownToError } from "@vortex/shared";
+import { buildRunnerId } from "@vortex/shared/linux";
 import Bluebird from "bluebird";
 import * as fsExtra from "fs-extra";
 import turbowalk from "turbowalk";
@@ -246,13 +247,132 @@ function applyProtonDiscoveryFields(
 ): IDiscoveryResult {
   const steamEntry = storeEntry as ISteamEntry | undefined;
   if (steamEntry?.usesProton === true && steamEntry.compatDataPath !== undefined) {
+    const winePrefixPath = getWinePrefixPath(steamEntry.compatDataPath);
+    const compatibilityRunnerId =
+      steamEntry.protonPath !== undefined
+        ? buildRunnerId("proton", steamEntry.protonPath)
+        : undefined;
     return {
       ...disco,
       usesProton: true,
-      winePrefixPath: getWinePrefixPath(steamEntry.compatDataPath),
+      winePrefixPath,
+      compatDataPath: steamEntry.compatDataPath,
+      protonPath: steamEntry.protonPath,
+      compatibilityRunnerType: steamEntry.protonPath !== undefined ? "proton" : undefined,
+      compatibilityRunnerId,
     };
   }
+
+  const heroicEntry = storeEntry as
+    | (IGameStoreEntry & {
+        heroicAppName?: string;
+        winePrefixPath?: string;
+        protonPath?: string;
+        compatibilityRunnerId?: string;
+        compatibilityRunnerType?: "proton" | "wine";
+        winePrefixId?: string;
+      })
+    | undefined;
+
+  if (heroicEntry?.winePrefixPath !== undefined) {
+    return {
+      ...disco,
+      usesProton: heroicEntry.compatibilityRunnerType !== "wine",
+      winePrefixPath: heroicEntry.winePrefixPath,
+      protonPath: heroicEntry.protonPath,
+      compatibilityRunnerId: heroicEntry.compatibilityRunnerId,
+      compatibilityRunnerType: heroicEntry.compatibilityRunnerType,
+      heroicAppName: heroicEntry.heroicAppName,
+      winePrefixId: heroicEntry.winePrefixId,
+      compatDataPath:
+        heroicEntry.compatibilityRunnerType === "proton" ? heroicEntry.winePrefixPath : undefined,
+    };
+  }
+
   return disco;
+}
+
+export async function enrichDiscoveryWithCompatibility(
+  game: IGame,
+  disco: IDiscoveryResult,
+): Promise<IDiscoveryResult> {
+  if (process.platform === "win32" || disco.path === undefined) {
+    return disco;
+  }
+
+  let enriched = await enrichManualDiscoveryWithProton(game, disco);
+
+  try {
+    const discovery = await window.api.linux.discoverCompatibility({
+      gamePath: enriched.path,
+      steamAppId: game.details?.steamAppId,
+      heroicAppName: enriched.heroicAppName,
+    });
+
+    const heroicMatch = discovery.heroicMatch;
+    if (heroicMatch !== undefined) {
+      enriched = {
+        ...enriched,
+        heroicAppName: heroicMatch.appName,
+      };
+
+      if (enriched.winePrefixPath === undefined && heroicMatch.winePrefix !== undefined) {
+        enriched = {
+          ...enriched,
+          winePrefixPath: heroicMatch.winePrefix,
+          usesProton: heroicMatch.runnerType !== "wine",
+        };
+      }
+
+      if (enriched.protonPath === undefined && heroicMatch.runnerPath !== undefined) {
+        const runnerType = heroicMatch.runnerType ?? "proton";
+        const runnerPath =
+          runnerType === "proton" ? path.dirname(heroicMatch.runnerPath) : heroicMatch.runnerPath;
+        enriched = {
+          ...enriched,
+          protonPath: runnerType === "proton" ? runnerPath : undefined,
+          compatibilityRunnerType: runnerType,
+          compatibilityRunnerId: buildRunnerId(runnerType, runnerPath),
+          usesProton: runnerType === "proton",
+          compatDataPath:
+            runnerType === "proton"
+              ? (enriched.compatDataPath ?? heroicMatch.winePrefix)
+              : enriched.compatDataPath,
+        };
+      }
+    }
+
+    if (
+      enriched.winePrefixId === undefined &&
+      enriched.winePrefixPath !== undefined &&
+      discovery.prefixes.length > 0
+    ) {
+      const matchedPrefix = discovery.prefixes.find(
+        (prefix) => prefix.path === enriched.winePrefixPath,
+      );
+      if (matchedPrefix !== undefined) {
+        enriched = {
+          ...enriched,
+          winePrefixId: matchedPrefix.id,
+        };
+      }
+    }
+
+    if (enriched.compatibilityRunnerId === undefined && enriched.protonPath !== undefined) {
+      enriched = {
+        ...enriched,
+        compatibilityRunnerId: buildRunnerId("proton", enriched.protonPath),
+        compatibilityRunnerType: "proton",
+      };
+    }
+  } catch (err) {
+    log("debug", "Could not enrich discovery with compatibility options", {
+      gameId: game.id,
+      error: getErrorMessageOrDefault(err),
+    });
+  }
+
+  return enriched;
 }
 
 export async function enrichManualDiscoveryWithProton(
@@ -306,11 +426,13 @@ function handleDiscoveredGame(
     },
     storeEntry,
   );
-  onDiscoveredGame(game.id, disco);
-  return getNormalizeFunc(resolvedPath)
-    .then((normalize) =>
-      discoverRelativeTools(game, resolvedPath, discoveredGames, onDiscoveredTool, normalize),
-    )
+  return enrichDiscoveryWithCompatibility(game, disco)
+    .then((enriched) => {
+      onDiscoveredGame(game.id, enriched);
+      return getNormalizeFunc(resolvedPath).then((normalize) =>
+        discoverRelativeTools(game, resolvedPath, discoveredGames, onDiscoveredTool, normalize),
+      );
+    })
     .then(() => game.id)
     .catch((err) => {
       onDiscoveredGame(game.id, undefined);

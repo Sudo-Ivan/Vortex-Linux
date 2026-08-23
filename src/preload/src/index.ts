@@ -131,6 +131,8 @@ try {
       getSystemHealth: () => betterIpcRenderer.invoke("linux:get-system-health"),
       repairDesktopIntegration: () => betterIpcRenderer.invoke("linux:repair-desktop-integration"),
       supportsInstallerSandbox: () => betterIpcRenderer.invoke("linux:supports-installer-sandbox"),
+      discoverCompatibility: (query) =>
+        betterIpcRenderer.invoke("linux:discover-compatibility", query),
     },
 
     dialog: {

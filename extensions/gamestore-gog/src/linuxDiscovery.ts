@@ -1,6 +1,16 @@
 import * as path from "path";
 
 import { fs, log, types } from "@nexusmods/vortex-api";
+import {
+  buildPrefixId,
+  buildRunnerId,
+  expandHomePath,
+  getHeroicConfigDirs,
+  heroicGameSettingsFromConfig,
+  type IHeroicConfigFile,
+  type IHeroicGameConfigFile,
+  resolveHeroicGameCompatibility,
+} from "@vortex/shared/linux";
 import Bluebird from "bluebird";
 
 const STORE_ID = "gog";
@@ -24,15 +34,17 @@ interface IHeroicInstalledFile {
   }>;
 }
 
-interface IHeroicConfigFile {
+interface IHeroicConfigFileLocal {
   defaultInstallPath?: string;
 }
 
-function getHeroicConfigDirs(home: string): string[] {
-  return [
-    path.join(home, ".config", "heroic"),
-    path.join(home, ".var", "app", "com.heroicgameslauncher.hgl", "config", "heroic"),
-  ];
+interface IHeroicGameStoreEntry extends types.IGameStoreEntry {
+  heroicAppName?: string;
+  winePrefixPath?: string;
+  protonPath?: string;
+  compatibilityRunnerId?: string;
+  compatibilityRunnerType?: "proton" | "wine";
+  winePrefixId?: string;
 }
 
 function getDefaultScanRoots(home: string): string[] {
@@ -132,37 +144,103 @@ async function entryFromInfoFile(infoPath: string): Promise<types.IGameStoreEntr
   };
 }
 
+async function heroicEntryFromInstalledGame(
+  home: string,
+  configDir: string,
+  heroicConfig: IHeroicConfigFile | undefined,
+  game: { appName: string; install_path: string },
+  parsed?: types.IGameStoreEntry,
+): Promise<IHeroicGameStoreEntry> {
+  const gameConfig = await readJsonFile<IHeroicGameConfigFile>(
+    path.join(configDir, "GamesConfig", `${game.appName}.json`),
+  );
+  const settings = heroicGameSettingsFromConfig(gameConfig, game.appName);
+  const compatibility = resolveHeroicGameCompatibility(settings, heroicConfig, home);
+  const runnerType = compatibility.runnerType;
+  const runnerPath =
+    compatibility.runnerPath !== undefined && runnerType === "proton"
+      ? path.dirname(compatibility.runnerPath)
+      : compatibility.runnerPath;
+  const winePrefixPath = compatibility.winePrefix;
+
+  const baseEntry: IHeroicGameStoreEntry =
+    parsed !== undefined
+      ? { ...parsed }
+      : {
+          appid: game.appName,
+          gamePath: expandHomePath(game.install_path, home),
+          name: path.basename(game.install_path),
+          gameStoreId: STORE_ID,
+        };
+
+  return {
+    ...baseEntry,
+    heroicAppName: game.appName,
+    winePrefixPath,
+    protonPath: runnerType === "proton" ? runnerPath : undefined,
+    compatibilityRunnerType: runnerType,
+    compatibilityRunnerId:
+      runnerPath !== undefined && runnerType !== undefined
+        ? buildRunnerId(runnerType, runnerPath)
+        : undefined,
+    winePrefixId:
+      winePrefixPath !== undefined ? buildPrefixId("heroic", winePrefixPath) : undefined,
+  };
+}
+
 async function entriesFromHeroic(home: string): Promise<types.IGameStoreEntry[]> {
   const entries: types.IGameStoreEntry[] = [];
+  const installedFiles = [
+    "gog_store/installed.json",
+    "legendary_store/installed.json",
+    "epic_store/installed.json",
+    "nile_store/installed.json",
+    "sideload_apps/installed.json",
+  ];
 
   for (const configDir of getHeroicConfigDirs(home)) {
-    const installed = await readJsonFile<IHeroicInstalledFile>(
-      path.join(configDir, "gog_store", "installed.json"),
-    );
-    if (installed?.installed === undefined) {
-      continue;
-    }
+    const heroicConfig = await readJsonFile<IHeroicConfigFile>(path.join(configDir, "config.json"));
 
-    for (const game of installed.installed) {
-      if (game.appName === undefined || game.install_path === undefined) {
+    for (const installedRelative of installedFiles) {
+      const installed = await readJsonFile<IHeroicInstalledFile>(
+        path.join(configDir, installedRelative),
+      );
+      if (installed?.installed === undefined) {
         continue;
       }
 
-      const infoFiles = await findGogInfoFiles(game.install_path, 2);
-      if (infoFiles.length > 0) {
-        const parsed = await entryFromInfoFile(infoFiles[0]);
-        if (parsed !== undefined) {
-          entries.push(parsed);
+      for (const game of installed.installed) {
+        if (game.appName === undefined || game.install_path === undefined) {
           continue;
         }
-      }
 
-      entries.push({
-        appid: game.appName,
-        gamePath: game.install_path,
-        name: path.basename(game.install_path),
-        gameStoreId: STORE_ID,
-      });
+        const infoFiles = await findGogInfoFiles(game.install_path, 2);
+        if (infoFiles.length > 0) {
+          const parsed = await entryFromInfoFile(infoFiles[0]);
+          if (parsed !== undefined) {
+            entries.push(
+              await heroicEntryFromInstalledGame(
+                home,
+                configDir,
+                heroicConfig,
+                {
+                  appName: game.appName,
+                  install_path: game.install_path,
+                },
+                parsed,
+              ),
+            );
+            continue;
+          }
+        }
+
+        entries.push(
+          await heroicEntryFromInstalledGame(home, configDir, heroicConfig, {
+            appName: game.appName,
+            install_path: game.install_path,
+          }),
+        );
+      }
     }
   }
 
@@ -187,7 +265,7 @@ async function entriesFromScanRoots(scanRoots: string[]): Promise<types.IGameSto
 
 async function getHeroicDefaultInstallPath(home: string): Promise<string | undefined> {
   for (const configDir of getHeroicConfigDirs(home)) {
-    const config = await readJsonFile<IHeroicConfigFile>(path.join(configDir, "config.json"));
+    const config = await readJsonFile<IHeroicConfigFileLocal>(path.join(configDir, "config.json"));
     if (config?.defaultInstallPath !== undefined) {
       return config.defaultInstallPath;
     }

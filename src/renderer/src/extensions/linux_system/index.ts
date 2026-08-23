@@ -18,6 +18,20 @@ function init(context: IExtensionContext): boolean {
     85,
   );
 
+  context.registerSettings(
+    "Workarounds",
+    LazyComponent(() => require("./CompatibilitySettings")),
+    undefined,
+    () => {
+      if (process.platform !== "linux") {
+        return false;
+      }
+      const state = context.api.getState();
+      return state.settings.gameMode.discovered[state.session.base.gameMode]?.path !== undefined;
+    },
+    20,
+  );
+
   context.once(() => {
     let previousRoots = JSON.stringify(context.api.getState().settings.linux?.gogScanRoots ?? []);
     context.api.onStateChange(["settings", "linux", "gogScanRoots"], () => {

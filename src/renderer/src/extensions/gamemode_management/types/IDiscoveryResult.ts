@@ -19,6 +19,12 @@ export interface IDiscoveryResult {
   store?: string;
   usesProton?: boolean;
   winePrefixPath?: string;
+  protonPath?: string;
+  compatDataPath?: string;
+  compatibilityRunnerId?: string;
+  compatibilityRunnerType?: "proton" | "wine";
+  heroicAppName?: string;
+  winePrefixId?: string;
   tools?: {
     [id: string]: IDiscoveredTool;
   };

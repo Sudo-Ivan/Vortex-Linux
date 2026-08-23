@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import * as path from "node:path";
 
 import { mergeConfig, defineConfig } from "vitest/config";
 
@@ -11,7 +12,13 @@ export default mergeConfig(
   baseConfig,
   defineConfig({
     resolve: {
-      alias: [{ find: /^@nexusmods\/vortex-api$/, replacement: VORTEX_API_MOCK }],
+      alias: [
+        { find: /^@nexusmods\/vortex-api$/, replacement: VORTEX_API_MOCK },
+        {
+          find: "@vortex/shared/linux",
+          replacement: path.resolve(import.meta.dirname, "../../src/shared/src/api/linux.ts"),
+        },
+      ],
     },
     test: {
       environment: "node",

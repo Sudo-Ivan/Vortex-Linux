@@ -1,4 +1,7 @@
+import * as os from "node:os";
+
 import { betterIpcMain } from "../ipc";
+import { discoverCompatibilityOptions } from "./compatibilityDiscovery";
 import { isInstallerSandboxSupported } from "./installerSandbox";
 import { collectLinuxSystemHealth, repairLinuxDesktopIntegration } from "./systemHealth";
 
@@ -14,4 +17,8 @@ export function initLinuxIpc(): void {
   });
 
   betterIpcMain.handle("linux:supports-installer-sandbox", () => isInstallerSandboxSupported());
+
+  betterIpcMain.handle("linux:discover-compatibility", (_event, query) =>
+    discoverCompatibilityOptions(os.homedir(), query ?? {}),
+  );
 }

@@ -492,6 +492,9 @@ export interface LinuxApi {
   getSystemHealth(): Promise<LinuxSystemHealthReport>;
   repairDesktopIntegration(): Promise<LinuxDesktopRepairResult>;
   supportsInstallerSandbox(): Promise<boolean>;
+  discoverCompatibility(
+    query: import("./ipc").CompatibilityDiscoveryQuery,
+  ): Promise<import("./ipc").CompatibilityDiscoveryResult>;
 }
 
 /** API for interacting with the DownloadManager in main */
