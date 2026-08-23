@@ -3,18 +3,10 @@ import { ControlLabel, FormControl, FormGroup, HelpBlock } from "react-bootstrap
 import { useDispatch, useSelector } from "react-redux";
 
 import Toggle from "../../../controls/Toggle";
-import { setNexusForkSettings } from "../actions/forkSettings";
-import {
-  DEFAULT_NEXUS_FORK_SETTINGS,
-  type INexusForkSettings,
-} from "../nexusFork";
-import {
-  NEXUS_API_URL,
-  NEXUS_BASE_URL,
-  NEXUS_DOMAIN,
-  OAUTH_URL,
-} from "../constants";
 import type { IState } from "../../../types/IState";
+import { setNexusForkSettings } from "../actions/forkSettings";
+import { NEXUS_API_URL, NEXUS_BASE_URL, NEXUS_DOMAIN, OAUTH_URL } from "../constants";
+import { DEFAULT_NEXUS_FORK_SETTINGS, type INexusForkSettings } from "../nexusFork";
 
 function defaultApiBaseUrl(): string {
   const apiUrl = NEXUS_API_URL.replace(/\/+$/, "");
@@ -60,7 +52,7 @@ const NexusForkSettings: React.FC = () => {
             placeholder={defaultApiBaseUrl()}
             type="text"
             value={fork.apiBaseUrl ?? ""}
-            onChange={(event) =>
+            onChange={(event: React.FormEvent<any>) =>
               update({ apiBaseUrl: event.currentTarget.value || undefined })
             }
           />
@@ -72,7 +64,7 @@ const NexusForkSettings: React.FC = () => {
             placeholder={NEXUS_BASE_URL}
             type="text"
             value={fork.websiteUrl ?? ""}
-            onChange={(event) =>
+            onChange={(event: React.FormEvent<any>) =>
               update({ websiteUrl: event.currentTarget.value || undefined })
             }
           />
@@ -84,7 +76,9 @@ const NexusForkSettings: React.FC = () => {
             placeholder={`https://users.${NEXUS_DOMAIN}`}
             type="text"
             value={fork.usersUrl ?? ""}
-            onChange={(event) => update({ usersUrl: event.currentTarget.value || undefined })}
+            onChange={(event: React.FormEvent<any>) =>
+              update({ usersUrl: event.currentTarget.value || undefined })
+            }
           />
         </FormGroup>
 
@@ -94,7 +88,9 @@ const NexusForkSettings: React.FC = () => {
             placeholder={OAUTH_URL}
             type="text"
             value={fork.oauthUrl ?? ""}
-            onChange={(event) => update({ oauthUrl: event.currentTarget.value || undefined })}
+            onChange={(event: React.FormEvent<any>) =>
+              update({ oauthUrl: event.currentTarget.value || undefined })
+            }
           />
         </FormGroup>
 

@@ -22,6 +22,7 @@
     "redux": "catalog:",
     "redux-act": "catalog:",
     "@nexusmods/vortex-api": "workspace:*",
+    "@vortex/shared": "workspace:*",
     "vortex-parse-ini": "catalog:"
   },
   "nx": {

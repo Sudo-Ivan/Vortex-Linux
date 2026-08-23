@@ -301,6 +301,20 @@ export interface ISettingsLinux {
   gogScanRoots: string[];
 }
 
+export interface ISettingsNexusFork {
+  apiBaseUrl?: string;
+  websiteUrl?: string;
+  usersUrl?: string;
+  oauthUrl?: string;
+  disablePremiumGates?: boolean;
+  autoResolveDependencies?: boolean;
+}
+
+export interface ISettingsNexus {
+  associateNXM?: boolean;
+  fork?: ISettingsNexusFork;
+}
+
 export interface ISettings {
   interface: ISettingsInterface;
   automation: ISettingsAutomation;
@@ -314,6 +328,7 @@ export interface ISettings {
   update: ISettingsUpdate;
   workarounds: ISettingsWorkarounds;
   linux?: ISettingsLinux;
+  nexus?: ISettingsNexus;
 }
 
 export interface IStateTransactions {

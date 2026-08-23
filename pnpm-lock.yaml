@@ -2853,6 +2853,9 @@ importers:
       '@types/bluebird':
         specifier: 'catalog:'
         version: 3.5.20
+      '@vortex/shared':
+        specifier: workspace:*
+        version: link:../../src/shared
       bluebird:
         specifier: 'catalog:'
         version: 3.7.2
