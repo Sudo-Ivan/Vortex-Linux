@@ -9,7 +9,7 @@ import {
   syncMyGamesPath,
 } from "./linuxGamePaths";
 
-describe("linuxGamePaths", () => {
+describe.skipIf(process.platform !== "linux")("linuxGamePaths", () => {
   it("uses proton documents when a wine prefix is present", () => {
     const prefix = "/compatdata/123/pfx";
     expect(documentsPathForSaves({ winePrefixPath: prefix })).toBe(

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { documentsPathForSaves } from "./linuxGamePaths";
 
-describe("documentsPathForSaves", () => {
+describe.skipIf(process.platform !== "linux")("documentsPathForSaves", () => {
   it("uses the wine prefix documents directory for proton games", () => {
     const prefix = "/compatdata/123/pfx";
     expect(documentsPathForSaves({ winePrefixPath: prefix })).toBe(
