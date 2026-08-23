@@ -1,3 +1,5 @@
+import * as path from "node:path";
+
 import { Base, OS } from "@nexusmods/adaptor-api";
 import { QualifiedPath } from "@nexusmods/adaptor-api/fs";
 import { describe, expect, it } from "vitest";
@@ -40,8 +42,9 @@ describe("resolveProtonWindowsBases", () => {
 
 describe("getWineDocumentsPath", () => {
   it("returns the steamuser documents directory inside the prefix", () => {
-    expect(getWineDocumentsPath("/compatdata/123/pfx")).toBe(
-      "/compatdata/123/pfx/drive_c/users/steamuser/Documents",
+    const prefix = "/compatdata/123/pfx";
+    expect(getWineDocumentsPath(prefix)).toBe(
+      path.join(prefix, "drive_c", "users", "steamuser", "Documents"),
     );
   });
 });

@@ -14,9 +14,10 @@ function documentsPathForSaves(
 
 describe("documentsPathForSaves", () => {
   it("uses the wine prefix documents directory for proton games", () => {
-    expect(
-      documentsPathForSaves({ winePrefixPath: "/compatdata/123/pfx" }, "/home/user/Documents"),
-    ).toBe("/compatdata/123/pfx/drive_c/users/steamuser/Documents");
+    const prefix = "/compatdata/123/pfx";
+    expect(documentsPathForSaves({ winePrefixPath: prefix }, "/home/user/Documents")).toBe(
+      path.join(prefix, "drive_c", "users", "steamuser", "Documents"),
+    );
   });
 
   it("falls back to host documents for native games", () => {

@@ -91,7 +91,7 @@ describe("systemHealth helpers", () => {
 
     expect(candidates[0]).toBe("/opt/vortex/dotnet");
     expect(candidates).toContain("/usr/share/dotnet");
-    expect(candidates).toContain("/home/alice/.dotnet");
+    expect(candidates).toContain(path.join("/home/alice", ".dotnet"));
   });
 
   it("accepts dotnet 9 or newer runtimes", () => {
