@@ -74,6 +74,11 @@ export const useToolsData = () => {
     return newTools;
   }, [knownGames, discoveredGames, discoveredTools, toolsOrder, gameMode]);
 
+  const gameStarter = useMemo(
+    () => generateGameStarter(knownGames, discoveredGames, gameMode),
+    [knownGames, discoveredGames, gameMode],
+  );
+
   useEffect(() => {
     const discoveryPath = discoveredGames[gameMode]?.path;
     if (discoveryPath !== undefined) {
@@ -134,6 +139,7 @@ export const useToolsData = () => {
   return {
     gameMode,
     tools,
+    gameStarter,
     toolsOrder,
     knownGames,
     discoveredGames,

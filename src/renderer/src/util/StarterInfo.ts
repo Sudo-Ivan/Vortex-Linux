@@ -585,6 +585,7 @@ class StarterInfo implements IStarterInfo {
       this.id = getSafe(toolDiscovery, ["id"], getSafe(tool, ["id"], undefined));
       this.isGame = false;
       this.initFromTool(this.gameId, tool, toolDiscovery);
+      this.applyGameLaunchContext(game, gameDiscovery);
     }
     if (this.id === undefined || this.name === undefined) {
       throw new Error("invalid starter information");
@@ -637,6 +638,20 @@ class StarterInfo implements IStarterInfo {
       this.shell = tool.shell;
     }
     this.iconOutPath = StarterInfo.toolIconRW(gameId, this.id);
+  }
+
+  /**
+   * Tools such as SKSE inherit the game's launch environment (SteamAPPId, etc.) and default
+   * working directory. Without this, Proton launches of script extenders can exit immediately.
+   */
+  private applyGameLaunchContext(game: IGameStored, gameDiscovery: IDiscoveryResult) {
+    const gameEnv = getSafe(gameDiscovery, ["envCustomized"], false)
+      ? getSafe(gameDiscovery, ["environment"], {})
+      : getSafe(game, ["environment"], {});
+    this.environment = { ...gameEnv, ...this.environment };
+    if (gameDiscovery.path !== undefined && this.workingDirectory.length === 0) {
+      this.workingDirectory = gameDiscovery.path;
+    }
   }
 }
 

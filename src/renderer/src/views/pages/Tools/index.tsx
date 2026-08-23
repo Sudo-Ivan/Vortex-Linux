@@ -52,6 +52,7 @@ export const ToolsPage: FC<React.PropsWithChildren<{ active?: boolean }>> = ({ a
     toolBeingEdited,
     counter,
     launcherTool,
+    gameStarter,
     otherPinnedTools,
     unpinnedTools,
     isToolValid,
@@ -120,6 +121,24 @@ export const ToolsPage: FC<React.PropsWithChildren<{ active?: boolean }>> = ({ a
                       {t("Runs instead of the game when you hit Play.")}
                     </Typography>
                   )}
+                  {launcherTool &&
+                    !launcherTool.isGame &&
+                    gameStarter !== null &&
+                    gameStarter !== undefined && (
+                      <ToolRow
+                        counter={counter}
+                        isPinned={false}
+                        isPrimary={false}
+                        isRunning={isToolRunning(gameStarter)}
+                        isValid={gameStarter.isGame || isToolValid(gameStarter)}
+                        starter={gameStarter}
+                        onEdit={editTool}
+                        onRemove={removeTool}
+                        onRun={startTool}
+                        onSetPrimary={setToolPrimary}
+                        onTogglePin={togglePin}
+                      />
+                    )}
                 </Panel>
 
                 {/* Pinned tools section */}
