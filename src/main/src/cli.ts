@@ -178,6 +178,21 @@ export function updateStartupSettings(updater: (current: IParameters) => IParame
   writeFileSync(filePath, json);
 }
 
+export function injectLinuxNxmDownloadFlag(argv: string[]): string[] {
+  if (process.platform !== "linux") {
+    return argv;
+  }
+
+  const nxmArg = argv.findIndex((arg) => arg.startsWith("nxm://"));
+  if (nxmArg !== -1 && !(nxmArg > 0 && argv[nxmArg - 1] === "-d")) {
+    const next = argv.slice();
+    next.splice(nxmArg, 0, "-d");
+    return next;
+  }
+
+  return argv;
+}
+
 export function parseCommandline(argv: string[], electronIsShitHack: boolean): IParameters {
   // lets look and replace epic stuff?!
   argv = transformEpicArguments(argv);
@@ -190,6 +205,8 @@ export function parseCommandline(argv: string[], electronIsShitHack: boolean): I
   if (electronIsShitHack) {
     argv = electronIsShitArgumentSort(argv);
   }
+
+  argv = injectLinuxNxmDownloadFlag(argv);
 
   let version: string = "1.0.0";
   try {

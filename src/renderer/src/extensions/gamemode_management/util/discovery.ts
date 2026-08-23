@@ -255,6 +255,35 @@ function applyProtonDiscoveryFields(
   return disco;
 }
 
+export async function enrichManualDiscoveryWithProton(
+  game: IGame,
+  disco: IDiscoveryResult,
+): Promise<IDiscoveryResult> {
+  if (disco.winePrefixPath !== undefined || disco.path === undefined) {
+    return disco;
+  }
+
+  const steamAppId = game.details?.steamAppId;
+  if (steamAppId === undefined) {
+    return disco;
+  }
+
+  const steamApps = path.resolve(disco.path, "..", "..");
+  const compatDataPath = path.join(steamApps, "compatdata", String(steamAppId));
+  const winePrefixPath = getWinePrefixPath(compatDataPath);
+
+  try {
+    await fs.statAsync(winePrefixPath);
+    return {
+      ...disco,
+      usesProton: true,
+      winePrefixPath,
+    };
+  } catch {
+    return disco;
+  }
+}
+
 function handleDiscoveredGame(
   game: IGame,
   resolvedPath: string,

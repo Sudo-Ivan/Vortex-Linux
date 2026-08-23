@@ -53,7 +53,8 @@
     "reselect": "catalog:",
     "shortid": "catalog:",
     "typed-binary": "catalog:",
-    "@nexusmods/vortex-api": "workspace:*"
+    "@nexusmods/vortex-api": "workspace:*",
+    "@vortex/shared": "workspace:*"
   },
   "optionalDependencies": {
     "loot": "catalog:"

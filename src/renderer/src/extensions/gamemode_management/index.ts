@@ -58,6 +58,7 @@ import { currentGame, currentGameDiscovery, discoveryByGame, gameById } from "./
 import type { IDiscoveryResult } from "./types/IDiscoveryResult";
 import type { IGameStored } from "./types/IGameStored";
 import type { IModType } from "./types/IModType";
+import { enrichManualDiscoveryWithProton } from "./util/discovery";
 import getDriveList from "./util/getDriveList";
 import { getGame, getGameStore, getGameStores } from "./util/getGame";
 import { getModType, getModTypeExtensions, registerModType } from "./util/modTypeExtensions";
@@ -311,31 +312,39 @@ function browseGameLocation(api: IExtensionApi, gameId: string): PromiseBB<void>
             }
             return manualGameStoreSelection(api, corrected);
           })
-          .then(({ corrected, store }) => {
-            let executable = game.executable(corrected);
-            if (executable === game.executable()) {
-              executable = undefined;
-            }
-            // different paths depending on whether the game was previously detected
-            // or not so that we don't overwrite user settings
-            if (defaultPath !== undefined) {
-              api.store.dispatch(setGamePath(game.id, corrected, store, executable));
-            } else {
-              api.store.dispatch(
-                addDiscoveredGame(game.id, {
-                  path: corrected,
-                  tools: {},
-                  hidden: false,
-                  environment: game.environment,
-                  executable,
-                  pathSetManually: true,
-                  store,
-                }),
-              );
-            }
-
-            // discovery should still point to the old data at this point.
+          .then(({ corrected, store }) =>
+            enrichManualDiscoveryWithProton(game, {
+              path: corrected,
+              tools: {},
+              hidden: false,
+              environment: game.environment,
+              executable: undefined,
+              pathSetManually: true,
+              store,
+            }).then((discoveryResult) => {
+              let executable = game.executable(corrected);
+              if (executable === game.executable()) {
+                executable = undefined;
+              }
+              discoveryResult.executable = executable;
+              if (defaultPath !== undefined) {
+                api.store.dispatch(setGamePath(game.id, corrected, store, executable));
+                if (discoveryResult.winePrefixPath !== undefined) {
+                  api.store.dispatch(
+                    addDiscoveredGame(game.id, {
+                      usesProton: discoveryResult.usesProton,
+                      winePrefixPath: discoveryResult.winePrefixPath,
+                    }),
+                  );
+                }
+              } else {
+                api.store.dispatch(addDiscoveredGame(game.id, discoveryResult));
+              }
+            }),
+          )
+          .then(() => {
             const previousStore = discovery?.store;
+            const store = api.store.getState().settings.gameMode.discovered[game.id]?.store;
             if (previousStore != null && previousStore !== store) {
               const storeChangedDialog = async () =>
                 api.showDialog(

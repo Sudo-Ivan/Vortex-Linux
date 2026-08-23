@@ -45,6 +45,11 @@
       "import": "./dist/ipc.js",
       "require": "./dist/ipc.cjs"
     },
+    "./linux": {
+      "development": "./src/api/linux.ts",
+      "import": "./dist/linux.js",
+      "require": "./dist/linux.cjs"
+    },
     "./preload": {
       "development": "./src/api/preload.ts",
       "import": "./dist/preload.js",
@@ -96,6 +101,10 @@
       "./ipc": {
         "import": "./dist/ipc.js",
         "require": "./dist/ipc.cjs"
+      },
+      "./linux": {
+        "import": "./dist/linux.js",
+        "require": "./dist/linux.cjs"
       },
       "./preload": {
         "import": "./dist/preload.js",

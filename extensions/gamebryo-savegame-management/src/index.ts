@@ -19,14 +19,23 @@ import { settingsReducer } from "./reducers/settings";
 import { ISavegame } from "./types/ISavegame";
 import {
   gameSupported,
+  ensureMyGamesPathResolved,
   iniPath,
   initGameSupport,
   mygamesPath,
+  onDiscoveryChanged,
   saveFiles,
 } from "./util/gameSupport";
 import { profileSavePath } from "./util/profileSavePath";
 import { refreshSavegames } from "./util/refreshSavegames";
 import restoreSavegamePlugins, { MissingPluginsError } from "./util/restoreSavegamePlugins";
+import {
+  createSaveSnapshot,
+  exportSavePack,
+  listSnapshots,
+  restoreSaveSnapshot,
+  snapshotDirectory,
+} from "./util/saveSnapshots";
 import transferSavegames from "./util/transferSavegames";
 import SavegameList from "./views/SavegameList";
 
@@ -192,9 +201,10 @@ function updateSavegames(api: types.IExtensionApi, update: util.Debouncer) {
     return Promise.resolve();
   }
 
-  const savesPath = getSavesPath(profile);
-
-  update.schedule(undefined, profile.id, savesPath);
+  return ensureMyGamesPathResolved(profile.gameId).then(() => {
+    const savesPath = getSavesPath(profile);
+    update.schedule(undefined, profile.id, savesPath);
+  });
 }
 
 function onProfileChange(api: types.IExtensionApi, profileId: string, update: util.Debouncer) {
@@ -256,6 +266,7 @@ function once(context: types.IExtensionContext, update: util.Debouncer) {
   );
 
   context.api.onStateChange(["settings", "gameMode", "discovered"], (previous, current) => {
+    onDiscoveryChanged();
     updateSavegames(context.api, update);
   });
 
@@ -329,6 +340,35 @@ function once(context: types.IExtensionContext, update: util.Debouncer) {
     onProfileChange(context.api, profileId, update),
   );
 
+  context.api.events.on("profile-will-change", (newProfileId: string, enqueue) => {
+    const state = context.api.store.getState();
+    const oldProfile = selectors.activeProfile(state);
+    const autoSnapshot = util.getSafe(
+      state,
+      ["settings", "saves", "autoSnapshotOnProfileSwitch"],
+      true,
+    );
+    if (
+      oldProfile === undefined ||
+      !gameSupported(oldProfile.gameId) ||
+      !autoSnapshot ||
+      oldProfile.id === newProfileId
+    ) {
+      return;
+    }
+
+    enqueue(() =>
+      ensureMyGamesPathResolved(oldProfile.gameId)
+        .then(() => {
+          const savesPath = path.join(mygamesPath(oldProfile.gameId), profileSavePath(oldProfile));
+          return getInstalledPlugins(context.api).then((plugins) =>
+            createSaveSnapshot(context.api, oldProfile, savesPath, "profile-switch", plugins),
+          );
+        })
+        .then(() => undefined),
+    );
+  });
+
   const onFocus = () => {
     updateSavegames(context.api, update);
   };
@@ -342,6 +382,11 @@ function once(context: types.IExtensionContext, update: util.Debouncer) {
     if (profile !== undefined) {
       const savePath = profileSavePath(profile);
       store.dispatch(setSavegamePath(savePath));
+      if (gameSupported(profile.gameId)) {
+        void ensureMyGamesPathResolved(profile.gameId).then(() =>
+          updateSavegames(context.api, update),
+        );
+      }
     }
   }
 }
@@ -596,6 +641,145 @@ function getInstalledPlugins(api: types.IExtensionApi): Promise<string[]> {
     });
 }
 
+function backupActiveSaves(api: types.IExtensionApi): Promise<void> {
+  const profile = selectors.activeProfile(api.getState());
+  if (profile === undefined || !gameSupported(profile.gameId)) {
+    return Promise.resolve();
+  }
+
+  return ensureMyGamesPathResolved(profile.gameId)
+    .then(() => {
+      const savesPath = path.join(mygamesPath(profile.gameId), profileSavePath(profile));
+      return getInstalledPlugins(api).then((plugins) =>
+        createSaveSnapshot(api, profile, savesPath, "manual", plugins),
+      );
+    })
+    .then((snapshotDir) => {
+      if (snapshotDir === undefined) {
+        api.sendNotification({
+          type: "warning",
+          message: "No save files were found to back up.",
+        });
+        return;
+      }
+      api.sendNotification({
+        type: "success",
+        message: "Save backup created.",
+      });
+    })
+    .catch((err) => {
+      api.showErrorNotification("Failed to back up saves", err);
+    });
+}
+
+function restoreLatestSnapshot(api: types.IExtensionApi): Promise<void> {
+  const profile = selectors.activeProfile(api.getState());
+  if (profile === undefined || !gameSupported(profile.gameId)) {
+    return Promise.resolve();
+  }
+
+  const userData = util.getVortexPath("userData");
+  return listSnapshots(userData, profile.gameId, profile.id)
+    .then((snapshots) => {
+      if (snapshots.length === 0) {
+        api.sendNotification({
+          type: "warning",
+          message: "No save backups are available for this profile.",
+        });
+        return undefined;
+      }
+      return api
+        .showDialog(
+          "question",
+          "Restore save backup",
+          {
+            text: "Restore the most recent save backup and optionally restore its plugin list?",
+          },
+          [{ label: "Cancel" }, { label: "Restore Saves" }, { label: "Restore Saves + Plugins" }],
+        )
+        .then((result) => {
+          if (result.action === "Cancel") {
+            return undefined;
+          }
+          const latest = snapshots[0];
+          const snapshotDir = snapshotDirectory(
+            userData,
+            profile.gameId,
+            profile.id,
+            latest.snapshotId,
+          );
+          const destSavePath = path.join(mygamesPath(profile.gameId), profileSavePath(profile));
+          return restoreSaveSnapshot(
+            api,
+            snapshotDir,
+            destSavePath,
+            result.action === "Restore Saves + Plugins",
+          );
+        });
+    })
+    .then((manifest) => {
+      if (manifest === undefined) {
+        return;
+      }
+      api.sendNotification({
+        type: "success",
+        message: "Save backup restored.",
+      });
+    })
+    .catch((err) => {
+      api.showErrorNotification("Failed to restore save backup", err);
+    });
+}
+
+function exportActiveSavePack(api: types.IExtensionApi): Promise<void> {
+  const profile = selectors.activeProfile(api.getState());
+  if (profile === undefined || !gameSupported(profile.gameId)) {
+    return Promise.resolve();
+  }
+
+  const userData = util.getVortexPath("userData");
+  return listSnapshots(userData, profile.gameId, profile.id)
+    .then((snapshots) => {
+      if (snapshots.length === 0) {
+        return backupActiveSaves(api).then(() =>
+          listSnapshots(userData, profile.gameId, profile.id),
+        );
+      }
+      return snapshots;
+    })
+    .then((snapshots) => {
+      if (snapshots === undefined || snapshots.length === 0) {
+        return undefined;
+      }
+      const latest = snapshots[0];
+      return api.selectDir({}).then((selected) => {
+        if (selected === undefined) {
+          return undefined;
+        }
+        const snapshotDir = snapshotDirectory(
+          userData,
+          profile.gameId,
+          profile.id,
+          latest.snapshotId,
+        );
+        const packName = `${profile.name}-${latest.snapshotId}`;
+        return exportSavePack(snapshotDir, selected, packName);
+      });
+    })
+    .then((exportedPath) => {
+      if (exportedPath === undefined) {
+        return;
+      }
+      api.sendNotification({
+        type: "success",
+        message: `Save pack exported to ${exportedPath}`,
+      });
+    })
+    .catch((err) => {
+      api.showErrorNotification("Failed to export save pack", err);
+    });
+}
+
 function init(context: IExtensionContextExt): boolean {
   initGameSupport(context.api);
 
@@ -668,6 +852,18 @@ function init(context: IExtensionContextExt): boolean {
 
   context.registerAction("savegames-icons", 150, "open-ext", {}, "Open Save Games", () => {
     openSavegamesDirectory(context.api);
+  });
+
+  context.registerAction("savegames-icons", 175, "backup", {}, "Backup Saves", () => {
+    void backupActiveSaves(context.api);
+  });
+
+  context.registerAction("savegames-icons", 180, "recover", {}, "Restore Backup", () => {
+    void restoreLatestSnapshot(context.api);
+  });
+
+  context.registerAction("savegames-icons", 185, "export", {}, "Export Save Pack", () => {
+    void exportActiveSavePack(context.api);
   });
 
   context.once(() => once(context, update));

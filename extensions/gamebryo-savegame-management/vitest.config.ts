@@ -10,6 +10,10 @@ export default mergeConfig(
     resolve: {
       alias: {
         "@nexusmods/vortex-api": path.resolve(import.meta.dirname, "__mocks__/vortex-api.ts"),
+        "@vortex/shared/linux": path.resolve(
+          import.meta.dirname,
+          "../../src/shared/src/api/linux.ts",
+        ),
       },
     },
     test: {

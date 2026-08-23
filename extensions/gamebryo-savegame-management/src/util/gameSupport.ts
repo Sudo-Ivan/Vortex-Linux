@@ -1,7 +1,14 @@
 import * as path from "path";
 
-import { selectors, types, util } from "@nexusmods/vortex-api";
-import * as Redux from "redux";
+import { fs, selectors, types, util } from "@nexusmods/vortex-api";
+import Promise from "bluebird";
+
+import {
+  getCachedMyGamesRoot,
+  invalidateResolvedMyGamesPath,
+  resolveMyGamesRoot,
+  syncMyGamesPath,
+} from "./linuxGamePaths";
 
 interface IGameSupport {
   mygamesPath: string;
@@ -18,7 +25,7 @@ function scriptExtenderFiles(input: string, seext: string): string[] {
 const gameSupport = util.makeOverlayableDictionary<string, IGameSupport>(
   {
     skyrim: {
-      mygamesPath: "skyrim",
+      mygamesPath: "Skyrim",
       iniName: "Skyrim.ini",
       prefIniName: "SkyrimPrefs.ini",
       saveFiles: (input: string): string[] => {
@@ -26,7 +33,7 @@ const gameSupport = util.makeOverlayableDictionary<string, IGameSupport>(
       },
     },
     enderal: {
-      mygamesPath: "enderal",
+      mygamesPath: "Enderal",
       iniName: "Enderal.ini",
       prefIniName: "EnderalPrefs.ini",
       saveFiles: (input: string): string[] =>
@@ -79,14 +86,6 @@ const gameSupport = util.makeOverlayableDictionary<string, IGameSupport>(
         return [].concat([input], scriptExtenderFiles(input, "nvse"));
       },
     },
-    // starfield: {
-    //   mygamesPath: 'Starfield',
-    //   iniName: 'StarfieldCustom.ini',
-    //   prefIniName: 'StarfieldPrefs.ini',
-    //   saveFiles: (input: string): string[] => {
-    //     return [].concat([input], scriptExtenderFiles(input, 'sfse'));
-    //   },
-    // },
     oblivion: {
       mygamesPath: "Oblivion",
       iniName: "Oblivion.ini",
@@ -110,9 +109,6 @@ const gameSupport = util.makeOverlayableDictionary<string, IGameSupport>(
       fallout4: {
         mygamesPath: "Fallout4 MS",
       },
-      // starfield: {
-      //   mygamesPath: path.join(util.getVortexPath('localAppData'), 'Packages', 'BethesdaSoftworks.Starfield_3275kfvn8vcwc', 'SystemAppData', 'wgs'),
-      // }
     },
     gog: {
       skyrimse: {
@@ -153,19 +149,21 @@ const gameSupport = util.makeOverlayableDictionary<string, IGameSupport>(
 );
 
 let discoveryForGame: (gameId: string) => types.IDiscoveryResult = () => undefined;
+let getGameDetails: (gameId: string) => types.IGame | undefined = () => undefined;
+let resolveFsApi:
+  | {
+      statAsync: (p: string) => Promise<unknown>;
+      readdirAsync: (p: string) => Promise<string[]>;
+    }
+  | undefined;
 
 export function initGameSupport(api: types.IExtensionApi) {
   discoveryForGame = (gameId: string) => selectors.discoveryByGame(api.store.getState(), gameId);
-}
-
-function documentsPathForSaves(gameMode: string): string {
-  const discovery = discoveryForGame(gameMode) as types.IDiscoveryResult & {
-    winePrefixPath?: string;
+  getGameDetails = (gameId: string) => util.getGame(gameId);
+  resolveFsApi = {
+    statAsync: (targetPath: string) => fs.statAsync(targetPath),
+    readdirAsync: (targetPath: string) => fs.readdirAsync(targetPath),
   };
-  if (discovery?.winePrefixPath !== undefined) {
-    return path.join(discovery.winePrefixPath, "drive_c", "users", "steamuser", "Documents");
-  }
-  return util.getVortexPath("documents");
 }
 
 export function gameSupported(gameMode: string): boolean {
@@ -173,11 +171,32 @@ export function gameSupported(gameMode: string): boolean {
 }
 
 export function mygamesPath(gameMode: string): string {
-  return path.join(
-    documentsPathForSaves(gameMode),
-    "My Games",
+  const discovery = discoveryForGame(gameMode);
+  return syncMyGamesPath(gameMode, gameSupport.get(gameMode, "mygamesPath"), discovery);
+}
+
+export function ensureMyGamesPathResolved(gameMode: string): Promise<string> {
+  const discovery = discoveryForGame(gameMode);
+  const game = getGameDetails(gameMode);
+  const cached = getCachedMyGamesRoot(gameMode);
+  if (cached !== undefined) {
+    return Promise.resolve(cached);
+  }
+  if (resolveFsApi === undefined) {
+    return Promise.resolve(mygamesPath(gameMode));
+  }
+  return resolveMyGamesRoot(
+    gameMode,
     gameSupport.get(gameMode, "mygamesPath"),
+    discovery,
+    discovery?.path,
+    game?.details?.steamAppId,
+    resolveFsApi,
   );
+}
+
+export function onDiscoveryChanged(): void {
+  invalidateResolvedMyGamesPath();
 }
 
 export function iniPath(gameMode: string): string {
