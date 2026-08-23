@@ -65,6 +65,9 @@ class ScreenshotCanvas extends React.Component<ICanvasProps, {}> {
 
     createImageBitmap(imgData)
       .then((bitmap) => {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.clearRect(0, 0, width, height);
         ctx.drawImage(bitmap, 0, 0);
       })
       .catch((err) => {

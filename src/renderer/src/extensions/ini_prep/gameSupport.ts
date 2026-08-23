@@ -173,7 +173,11 @@ const gameSupport = makeOverlayableDictionary<string, IGameSupport>(
 );
 
 export function iniFiles(gameMode: string, discovery: IDiscoveryResult) {
-  const mygames = path.join(getVortexPath("documents"), "My Games");
+  const documentsPath =
+    discovery?.winePrefixPath !== undefined
+      ? path.join(discovery.winePrefixPath, "drive_c", "users", "steamuser", "Documents")
+      : getVortexPath("documents");
+  const mygames = path.join(documentsPath, "My Games");
 
   let store = discovery?.store;
 

@@ -141,11 +141,12 @@ export function gameSupported(gameMode: string): boolean {
 }
 
 export function mygamesPath(gameMode: string): string {
-  return path.join(
-    util.getVortexPath("documents"),
-    "My Games",
-    gameSupport.get(gameMode, "mygamesPath"),
-  );
+  const discovery = discoveryForGame(gameMode);
+  const documentsPath =
+    discovery?.winePrefixPath !== undefined
+      ? path.join(discovery.winePrefixPath, "drive_c", "users", "steamuser", "Documents")
+      : util.getVortexPath("documents");
+  return path.join(documentsPath, "My Games", gameSupport.get(gameMode, "mygamesPath"));
 }
 
 export function gameSettingsFiles(gameMode: string, customPath: string): ISettingsFile[] {

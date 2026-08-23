@@ -854,7 +854,7 @@ function init(context: IExtensionContextExt): boolean {
     openSavegamesDirectory(context.api);
   });
 
-  context.registerAction("savegames-icons", 175, "backup", {}, "Backup Saves", () => {
+  context.registerAction("savegames-icons", 175, "folder-download", {}, "Backup Saves", () => {
     void backupActiveSaves(context.api);
   });
 
@@ -862,7 +862,7 @@ function init(context: IExtensionContextExt): boolean {
     void restoreLatestSnapshot(context.api);
   });
 
-  context.registerAction("savegames-icons", 185, "export", {}, "Export Save Pack", () => {
+  context.registerAction("savegames-icons", 185, "archive", {}, "Export Save Pack", () => {
     void exportActiveSavePack(context.api);
   });
 

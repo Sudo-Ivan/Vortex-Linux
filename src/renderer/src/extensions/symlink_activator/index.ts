@@ -62,7 +62,10 @@ class DeploymendMethod extends LinkingDeployment {
       gameId = activeGameId(state);
     }
 
-    if (this.isGamebryoGame(gameId) || this.isUnsupportedGame(gameId)) {
+    if (
+      process.platform !== "linux" &&
+      (this.isGamebryoGame(gameId) || this.isUnsupportedGame(gameId))
+    ) {
       // Mods for this games use some file types that have issues working with symbolic links
       return {
         description: (t) =>
@@ -89,7 +92,7 @@ class DeploymendMethod extends LinkingDeployment {
 
     try {
       fs.accessSync(modPaths[typeId], fs.constants.W_OK);
-      if (!this.ensureAdmin()) {
+      if (process.platform === "win32" && !this.ensureAdmin()) {
         return { description: (t) => t("Requires admin rights on windows.") };
       }
     } catch (err) {
