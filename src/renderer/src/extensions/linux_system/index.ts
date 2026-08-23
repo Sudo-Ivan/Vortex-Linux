@@ -1,6 +1,7 @@
 import LazyComponent from "../../controls/LazyComponent";
 import type { IExtensionContext } from "../../types/IExtensionContext";
 import GameStoreHelper from "../../util/GameStoreHelper";
+import { activeGameId } from "../../util/selectors";
 import settingsReducer from "./reducers";
 
 function init(context: IExtensionContext): boolean {
@@ -27,7 +28,8 @@ function init(context: IExtensionContext): boolean {
         return false;
       }
       const state = context.api.getState();
-      return state.settings.gameMode.discovered[state.session.base.gameMode]?.path !== undefined;
+      const gameId = activeGameId(state);
+      return gameId !== undefined && state.settings.gameMode.discovered[gameId]?.path !== undefined;
     },
     20,
   );

@@ -3,7 +3,7 @@ import type {
   CompatibilityRunner,
   WinePrefixOption,
 } from "@vortex/shared/ipc";
-import { buildPrefixId, buildRunnerId, parsePrefixId, parseRunnerId } from "@vortex/shared/linux";
+import { buildPrefixId, parsePrefixId, parseRunnerId } from "@vortex/shared/linux";
 import React from "react";
 import { useDispatch, useSelector } from "react-redux";
 
@@ -14,6 +14,7 @@ import { getGame } from "@/extensions/gamemode_management/util/getGame";
 import type { IState } from "@/types/IState";
 import { Button } from "@/ui/components/button/Button";
 import { Typography } from "@/ui/components/typography/Typography";
+import { activeGameId } from "@/util/selectors";
 
 interface ICompatibilitySettingsProps {
   gameId: string;
@@ -132,7 +133,7 @@ export function CompatibilitySettingsView({
 
 const CompatibilitySettings: React.FC = () => {
   const dispatch = useDispatch();
-  const gameId = useSelector((state: IState) => state.session.base.gameMode);
+  const gameId = useSelector((state: IState) => activeGameId(state));
   const discovery = useSelector((state: IState) => currentGameDiscovery(state));
   const game = gameId !== undefined ? getGame(gameId) : undefined;
   const [options, setOptions] = React.useState<CompatibilityDiscoveryResult | undefined>(undefined);

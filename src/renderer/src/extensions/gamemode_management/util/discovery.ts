@@ -426,7 +426,7 @@ function handleDiscoveredGame(
     },
     storeEntry,
   );
-  return enrichDiscoveryWithCompatibility(game, disco)
+  return Bluebird.resolve(enrichDiscoveryWithCompatibility(game, disco))
     .then((enriched) => {
       onDiscoveredGame(game.id, enriched);
       return getNormalizeFunc(resolvedPath).then((normalize) =>
@@ -436,10 +436,11 @@ function handleDiscoveredGame(
     .then(() => game.id)
     .catch((err) => {
       onDiscoveredGame(game.id, undefined);
-      if (err.message !== undefined) {
+      const message = getErrorMessageOrDefault(err);
+      if (message.length > 0) {
         log("debug", "game not found", {
           id: game.id,
-          err: err.message.replace(/(?:\r\n|\r|\n)/g, "; "),
+          err: message.replace(/(?:\r\n|\r|\n)/g, "; "),
         });
       } else {
         log("warn", "game not found - invalid exception", { id: game.id, err });
