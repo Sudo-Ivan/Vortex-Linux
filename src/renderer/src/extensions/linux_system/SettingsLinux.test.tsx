@@ -35,11 +35,14 @@ describe("SettingsLinuxView", () => {
   it("renders health checks and refresh control", () => {
     render(
       <SettingsLinuxView
+        gogScanRoots={[]}
         isLoading={false}
         isRepairing={false}
         repairMessage={undefined}
         report={sampleReport}
+        onAddScanRoot={vi.fn()}
         onRefresh={vi.fn()}
+        onRemoveScanRoot={vi.fn()}
         onRepairDesktopIntegration={vi.fn()}
       />,
     );
@@ -56,11 +59,14 @@ describe("SettingsLinuxView", () => {
 
     render(
       <SettingsLinuxView
+        gogScanRoots={[]}
         isLoading={false}
         isRepairing={false}
         repairMessage={undefined}
         report={sampleReport}
+        onAddScanRoot={vi.fn()}
         onRefresh={onRefresh}
+        onRemoveScanRoot={vi.fn()}
         onRepairDesktopIntegration={vi.fn()}
       />,
     );
@@ -72,11 +78,14 @@ describe("SettingsLinuxView", () => {
   it("hides repair when flatpak manages desktop integration", () => {
     render(
       <SettingsLinuxView
+        gogScanRoots={[]}
         isLoading={false}
         isRepairing={false}
         repairMessage={undefined}
         report={{ ...sampleReport, isFlatpak: true }}
+        onAddScanRoot={vi.fn()}
         onRefresh={vi.fn()}
+        onRemoveScanRoot={vi.fn()}
         onRepairDesktopIntegration={vi.fn()}
       />,
     );

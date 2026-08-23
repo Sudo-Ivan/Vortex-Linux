@@ -158,13 +158,23 @@ export function initGameSupport(api: types.IExtensionApi) {
   discoveryForGame = (gameId: string) => selectors.discoveryByGame(api.store.getState(), gameId);
 }
 
+function documentsPathForSaves(gameMode: string): string {
+  const discovery = discoveryForGame(gameMode) as types.IDiscoveryResult & {
+    winePrefixPath?: string;
+  };
+  if (discovery?.winePrefixPath !== undefined) {
+    return path.join(discovery.winePrefixPath, "drive_c", "users", "steamuser", "Documents");
+  }
+  return util.getVortexPath("documents");
+}
+
 export function gameSupported(gameMode: string): boolean {
   return gameSupport[gameMode] !== undefined;
 }
 
 export function mygamesPath(gameMode: string): string {
   return path.join(
-    util.getVortexPath("documents"),
+    documentsPathForSaves(gameMode),
     "My Games",
     gameSupport.get(gameMode, "mygamesPath"),
   );

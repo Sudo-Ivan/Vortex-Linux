@@ -43,6 +43,16 @@ function getDefaultScanRoots(home: string): string[] {
   ];
 }
 
+export function collectGogScanRoots(home: string, customRoots: string[] = []): string[] {
+  const roots = [...getDefaultScanRoots(home)];
+  for (const root of customRoots) {
+    if (root.length > 0 && !roots.includes(root)) {
+      roots.push(root);
+    }
+  }
+  return roots;
+}
+
 async function readJsonFile<T>(filePath: string): Promise<T | undefined> {
   try {
     const data = await fs.readFileAsync(filePath, { encoding: "utf8" });
@@ -219,8 +229,11 @@ function dedupeEntries(entries: types.IGameStoreEntry[]): types.IGameStoreEntry[
   return Array.from(byAppId.values());
 }
 
-export async function discoverLinuxGogGames(home: string): Promise<types.IGameStoreEntry[]> {
-  const scanRoots = getDefaultScanRoots(home);
+export async function discoverLinuxGogGames(
+  home: string,
+  customRoots: string[] = [],
+): Promise<types.IGameStoreEntry[]> {
+  const scanRoots = collectGogScanRoots(home, customRoots);
   const heroicDefaultPath = await getHeroicDefaultInstallPath(home);
   if (heroicDefaultPath !== undefined && !scanRoots.includes(heroicDefaultPath)) {
     scanRoots.push(heroicDefaultPath);

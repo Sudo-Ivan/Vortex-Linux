@@ -10,6 +10,7 @@ import type {
   Serializable,
   SerializedError,
   WireResult,
+  ProtonSnapshotContext,
 } from "@vortex/shared/ipc";
 import type { PreloadWindow } from "@vortex/shared/preload";
 import type { PersistedHive } from "@vortex/shared/state";
@@ -109,8 +110,8 @@ try {
       listWithInfoSync: () => ipcRenderer.sendSync("adaptors:list-with-info"),
       call: (adaptorName: string, serviceUri: string, method: string, args: unknown[]) =>
         betterIpcRenderer.invoke("adaptors:call", adaptorName, serviceUri, method, args),
-      buildSnapshot: (store: string, gamePath: string) =>
-        betterIpcRenderer.invoke("adaptors:build-snapshot", store, gamePath),
+      buildSnapshot: (store: string, gamePath: string, protonContext?: ProtonSnapshotContext) =>
+        betterIpcRenderer.invoke("adaptors:build-snapshot", store, gamePath, protonContext),
       detectVersion: (source: { type: string; path: { value: string }; regex?: string }) =>
         betterIpcRenderer.invoke("adaptors:detect-version", source),
     },

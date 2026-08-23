@@ -1,10 +1,14 @@
 import LazyComponent from "../../controls/LazyComponent";
 import type { IExtensionContext } from "../../types/IExtensionContext";
+import GameStoreHelper from "../../util/GameStoreHelper";
+import settingsReducer from "./reducers";
 
 function init(context: IExtensionContext): boolean {
   if (process.platform !== "linux") {
     return true;
   }
+
+  context.registerReducer(["settings", "linux"], settingsReducer);
 
   context.registerSettings(
     "Vortex",
@@ -13,6 +17,17 @@ function init(context: IExtensionContext): boolean {
     () => process.platform === "linux",
     85,
   );
+
+  context.once(() => {
+    let previousRoots = JSON.stringify(context.api.getState().settings.linux?.gogScanRoots ?? []);
+    context.api.onStateChange(["settings", "linux", "gogScanRoots"], () => {
+      const nextRoots = JSON.stringify(context.api.getState().settings.linux?.gogScanRoots ?? []);
+      if (nextRoots !== previousRoots) {
+        previousRoots = nextRoots;
+        GameStoreHelper.reloadGames(context.api).catch(() => undefined);
+      }
+    });
+  });
 
   return true;
 }

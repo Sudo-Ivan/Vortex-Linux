@@ -19,8 +19,10 @@ import GameStoreHelper from "../../../util/GameStoreHelper";
 import type { Normalize } from "../../../util/getNormalizeFunc";
 import getNormalizeFunc from "../../../util/getNormalizeFunc";
 import getVortexPath from "../../../util/getVortexPath";
+import { getWinePrefixPath } from "../../../util/linux/proton";
 import { log } from "../../../util/log";
 import StarterInfo from "../../../util/StarterInfo";
+import type { ISteamEntry } from "../../../util/Steam";
 import { getSafe } from "../../../util/storeHelper";
 import { truthy } from "../../../util/util";
 import { modPathsForGame } from "../../mod_management/selectors";
@@ -238,6 +240,21 @@ function queryByCB(game: IGame): Bluebird<Partial<IGameStoreEntry>> {
     );
 }
 
+function applyProtonDiscoveryFields(
+  disco: IDiscoveryResult,
+  storeEntry?: IGameStoreEntry,
+): IDiscoveryResult {
+  const steamEntry = storeEntry as ISteamEntry | undefined;
+  if (steamEntry?.usesProton === true && steamEntry.compatDataPath !== undefined) {
+    return {
+      ...disco,
+      usesProton: true,
+      winePrefixPath: getWinePrefixPath(steamEntry.compatDataPath),
+    };
+  }
+  return disco;
+}
+
 function handleDiscoveredGame(
   game: IGame,
   resolvedPath: string,
@@ -245,17 +262,21 @@ function handleDiscoveredGame(
   discoveredGames: { [id: string]: IDiscoveryResult },
   onDiscoveredGame: DiscoveredCB,
   onDiscoveredTool: DiscoveredToolCB,
+  storeEntry?: IGameStoreEntry,
 ): Bluebird<string> {
   if (!truthy(resolvedPath)) {
     return undefined;
   }
   log("info", "found game", { name: game.name, location: resolvedPath, store });
   const exe = game.executable(resolvedPath);
-  const disco: IDiscoveryResult = {
-    path: resolvedPath,
-    executable: exe !== game.executable() ? exe : undefined,
-    store,
-  };
+  const disco: IDiscoveryResult = applyProtonDiscoveryFields(
+    {
+      path: resolvedPath,
+      executable: exe !== game.executable() ? exe : undefined,
+      store,
+    },
+    storeEntry,
+  );
   onDiscoveredGame(game.id, disco);
   return getNormalizeFunc(resolvedPath)
     .then((normalize) =>
@@ -312,6 +333,7 @@ export function quickDiscovery(
                 discoveredGames,
                 onDiscoveredGame,
                 onDiscoveredTool,
+                result,
               );
             } else {
               return Bluebird.resolve(undefined);
@@ -329,6 +351,7 @@ export function quickDiscovery(
               discoveredGames,
               onDiscoveredGame,
               onDiscoveredTool,
+              result as IGameStoreEntry,
             );
           });
         } else {

@@ -17,6 +17,8 @@ export interface IDiscoveryResult {
   path?: string;
   pathSetManually?: boolean;
   store?: string;
+  usesProton?: boolean;
+  winePrefixPath?: string;
   tools?: {
     [id: string]: IDiscoveredTool;
   };

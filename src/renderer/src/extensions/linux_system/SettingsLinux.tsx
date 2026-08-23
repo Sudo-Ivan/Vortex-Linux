@@ -1,10 +1,16 @@
 import type { LinuxHealthCheck, LinuxSystemHealthReport } from "@vortex/shared/ipc";
 import React from "react";
+import { useDispatch, useSelector } from "react-redux";
 
+import { useMainContext } from "@/contexts";
+import type { IState } from "@/types/IState";
 import { Alert } from "@/ui/components/alert/Alert";
 import { Button } from "@/ui/components/button/Button";
 import { Typography } from "@/ui/components/typography/Typography";
 
+import { addGogScanRoot, removeGogScanRoot } from "./actions";
+import { GogScanRootsSection } from "./GogScanRootsSection";
+import { getGogScanRoots } from "./selectors";
 import { canRepairDesktopIntegration, healthStatusToSeverity } from "./statusMapping";
 
 interface ISettingsLinuxProps {
@@ -12,8 +18,11 @@ interface ISettingsLinuxProps {
   isLoading: boolean;
   isRepairing: boolean;
   repairMessage: string | undefined;
+  gogScanRoots: string[];
   onRefresh: () => void;
   onRepairDesktopIntegration: () => void;
+  onAddScanRoot: () => void;
+  onRemoveScanRoot: (root: string) => void;
 }
 
 function HealthCheckRow({ check }: { check: LinuxHealthCheck }) {
@@ -38,8 +47,11 @@ export function SettingsLinuxView({
   isLoading,
   isRepairing,
   repairMessage,
+  gogScanRoots,
   onRefresh,
   onRepairDesktopIntegration,
+  onAddScanRoot,
+  onRemoveScanRoot,
 }: ISettingsLinuxProps): JSX.Element {
   const showRepair =
     report !== undefined && canRepairDesktopIntegration(report.checks) && !report.isFlatpak;
@@ -97,12 +109,21 @@ export function SettingsLinuxView({
         {report?.checks.map((check) => (
           <HealthCheckRow key={check.id} check={check} />
         ))}
+
+        <GogScanRootsSection
+          roots={gogScanRoots}
+          onAddScanRoot={onAddScanRoot}
+          onRemoveScanRoot={onRemoveScanRoot}
+        />
       </div>
     </form>
   );
 }
 
 const SettingsLinux: React.FC = () => {
+  const { api } = useMainContext();
+  const dispatch = useDispatch();
+  const gogScanRoots = useSelector((state: IState) => getGogScanRoots(state));
   const [report, setReport] = React.useState<LinuxSystemHealthReport | undefined>(undefined);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isRepairing, setIsRepairing] = React.useState(false);
@@ -117,10 +138,6 @@ const SettingsLinux: React.FC = () => {
       setIsLoading(false);
     }
   }, []);
-
-  React.useEffect(() => {
-    void refresh();
-  }, [refresh]);
 
   const repairDesktopIntegration = React.useCallback(async () => {
     setIsRepairing(true);
@@ -138,8 +155,27 @@ const SettingsLinux: React.FC = () => {
     }
   }, [refresh]);
 
+  React.useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const addScanRoot = React.useCallback(async () => {
+    const selected = await api.selectDir({});
+    if (selected !== undefined) {
+      dispatch(addGogScanRoot(selected));
+    }
+  }, [api, dispatch]);
+
+  const removeScanRoot = React.useCallback(
+    (root: string) => {
+      dispatch(removeGogScanRoot(root));
+    },
+    [dispatch],
+  );
+
   return (
     <SettingsLinuxView
+      gogScanRoots={gogScanRoots}
       isLoading={isLoading}
       isRepairing={isRepairing}
       repairMessage={repairMessage}
@@ -150,6 +186,10 @@ const SettingsLinux: React.FC = () => {
       onRepairDesktopIntegration={() => {
         void repairDesktopIntegration();
       }}
+      onAddScanRoot={() => {
+        void addScanRoot();
+      }}
+      onRemoveScanRoot={removeScanRoot}
     />
   );
 };

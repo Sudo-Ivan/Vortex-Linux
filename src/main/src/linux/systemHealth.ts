@@ -1,9 +1,10 @@
 import { execFile } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { promisify } from "node:util";
 
+import { getVortexPath } from "../getVortexPath";
 import {
   ensureLinuxDesktopIntegration,
   shouldInstallLinuxDesktopIntegration,
@@ -333,6 +334,75 @@ function checkSteamInstallation(context: ISystemHealthContext): ILinuxHealthChec
   };
 }
 
+function listFomodAddonCandidates(packageRoot: string): string[] {
+  const candidates = [path.join(packageRoot, "build", "Release", "modinstaller.node")];
+  const binRoot = path.join(packageRoot, "bin");
+  if (!existsSync(binRoot)) {
+    return candidates;
+  }
+
+  for (const entry of readdirSync(binRoot)) {
+    const dir = path.join(binRoot, entry);
+    if (!statSync(dir).isDirectory()) {
+      continue;
+    }
+    for (const file of readdirSync(dir)) {
+      if (file.endsWith(".node")) {
+        candidates.push(path.join(dir, file));
+      }
+    }
+  }
+
+  return candidates;
+}
+
+function checkFomodNativeModule(): ILinuxHealthCheck {
+  const packageRoots = [
+    path.join(getVortexPath("application"), "node_modules", "@nexusmods", "fomod-installer-native"),
+  ];
+
+  if (process.resourcesPath !== undefined) {
+    packageRoots.push(
+      path.join(
+        process.resourcesPath,
+        "app.asar.unpacked",
+        "node_modules",
+        "@nexusmods",
+        "fomod-installer-native",
+      ),
+    );
+  }
+
+  const addonCandidates = packageRoots.flatMap((packageRoot) =>
+    listFomodAddonCandidates(packageRoot),
+  );
+
+  const resolved = addonCandidates.find((candidate) => {
+    if (!existsSync(candidate)) {
+      return false;
+    }
+    const soPath = path.join(path.dirname(candidate), "ModInstaller.Native.so");
+    return existsSync(soPath);
+  });
+
+  if (resolved !== undefined) {
+    return {
+      id: "fomod_native",
+      status: "ok",
+      summary: "FOMOD native installer module is present",
+      detail: resolved,
+    };
+  }
+
+  return {
+    id: "fomod_native",
+    status: "warning",
+    summary: "FOMOD native installer module was not found",
+    detail:
+      "Scripted FOMOD installers may still work, but native FOMOD installs can fail on Linux.",
+  };
+}
+
 async function checkXdgUtils(): Promise<ILinuxHealthCheck> {
   try {
     await execFileAsync("xdg-settings", ["--version"]);
@@ -374,6 +444,7 @@ export async function collectLinuxSystemHealth(
     checkDotNetRuntime(context),
     Promise.resolve(checkSteamInstallation(context)),
     checkXdgUtils(),
+    Promise.resolve(checkFomodNativeModule()),
   ]);
 
   return {

@@ -89,6 +89,11 @@ export interface LinuxDesktopRepairResult {
   reason?: string;
 }
 
+export interface ProtonSnapshotContext {
+  usesProton: boolean;
+  winePrefixPath: string;
+}
+
 /** Vortex application paths */
 export type VortexPaths = {
   base: string;
@@ -530,7 +535,11 @@ export interface InvokeChannels {
    * renderer uses this instead of constructing path bases itself so the
    * adaptor can be handed a fully-resolved {@link StorePathProvider}.
    */
-  "adaptors:build-snapshot": (store: string, gamePath: string) => Promise<Serializable>;
+  "adaptors:build-snapshot": (
+    store: string,
+    gamePath: string,
+    protonContext?: ProtonSnapshotContext,
+  ) => Promise<Serializable>;
 
   /**
    * Executes a declarative version detection strategy on the main

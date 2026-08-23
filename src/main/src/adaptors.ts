@@ -20,6 +20,12 @@ import { createFileSystemServiceHandler } from "./filesystem/fs-service";
 import { PathResolverRegistryImpl } from "./filesystem/path-resolver-registry";
 import { LinuxPathProviderImpl } from "./filesystem/paths.linux";
 import { WindowsPathProviderImpl } from "./filesystem/paths.windows";
+import {
+  type IProtonSnapshotContext,
+  isValidProtonContext,
+  linuxPathToWineZPath,
+  resolveProtonWindowsBases,
+} from "./linux/protonPaths";
 
 // Lazy-loaded to avoid pulling the native module at import time.
 let exeVersionFn: typeof exeVersionT | undefined;
@@ -254,18 +260,29 @@ const KNOWN_STORES: ReadonlySet<string> = new Set(Object.values(Store));
  * the same (Proton support will later translate this through the Wine
  * prefix).
  */
-function buildStorePathSnapshot(store: Store, gamePath: string): StorePathSnapshot {
+function buildStorePathSnapshot(
+  store: Store,
+  gamePath: string,
+  protonContext?: IProtonSnapshotContext,
+): StorePathSnapshot {
   const baseOS = detectHostOS();
-  // TODO: detect Proton on Steam/Linux and set gameOS = OS.Windows, plus
-  // resolve the game-side bases out of the Wine prefix. For now the game
-  // runtime matches the host.
-  const gameOS = baseOS;
+  const gameOS = isValidProtonContext(protonContext) ? OS.Windows : baseOS;
 
   const bases = new Map<OS, ReadonlyMap<Base, QualifiedPath>>();
   const platforms: OS[] = baseOS === gameOS ? [baseOS] : [baseOS, gameOS];
   for (const os of platforms) {
-    const inner = os === OS.Windows ? resolveWindowsBases() : resolveLinuxBases();
-    inner.set(Base.Game, nativeToQualifiedPath(gamePath, os));
+    const inner =
+      os === OS.Windows
+        ? isValidProtonContext(protonContext)
+          ? resolveProtonWindowsBases(nativeToQualifiedPath)
+          : resolveWindowsBases()
+        : resolveLinuxBases();
+
+    const gameNativePath =
+      os === OS.Windows && isValidProtonContext(protonContext)
+        ? linuxPathToWineZPath(gamePath)
+        : gamePath;
+    inner.set(Base.Game, nativeToQualifiedPath(gameNativePath, os));
     bases.set(os, inner);
   }
 
@@ -442,7 +459,7 @@ function registerIpcHandlers(): void {
    */
   betterIpcMain.handle(
     "adaptors:build-snapshot",
-    (_event: unknown, store: string, gamePath: string) => {
+    (_event: unknown, store: string, gamePath: string, protonContext?: IProtonSnapshotContext) => {
       if (!KNOWN_STORES.has(store)) {
         return Promise.reject(
           new Error(
@@ -456,7 +473,7 @@ function registerIpcHandlers(): void {
         );
       }
       return Promise.resolve(
-        buildStorePathSnapshot(store as Store, gamePath) as unknown,
+        buildStorePathSnapshot(store as Store, gamePath, protonContext) as unknown,
       ) as Promise<Serializable>;
     },
   );

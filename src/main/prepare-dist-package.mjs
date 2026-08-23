@@ -119,6 +119,8 @@ async function main() {
     await prepareWin();
   } else if (process.platform === "linux") {
     await prepareLinux();
+    const { fixFomodNativeLinuxDist } = await import("./fix-fomod-native-linux.mjs");
+    fixFomodNativeLinuxDist(MAIN_DIR);
   }
 }
 

@@ -20,7 +20,7 @@ function getDriveList(api: IExtensionApi): Promise<string[]> {
       },
       { allowReport: false },
     );
-    return Promise.resolve(["C:"]);
+    return Promise.resolve(process.platform === "linux" ? ["/"] : ["C:"]);
   }
 
   return list()

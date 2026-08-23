@@ -463,9 +463,13 @@ function registerAdaptor(context: IExtensionContext, adaptor: AdaptorEntry): voi
   }
 
   /** Resolves game paths. Called once after discovery. */
-  async function getPaths(store: string, gamePath: string): Promise<OpaqueGamePaths | null> {
+  async function getPaths(
+    store: string,
+    gamePath: string,
+    protonContext?: { usesProton: boolean; winePrefixPath: string },
+  ): Promise<OpaqueGamePaths | null> {
     if (!pathsResolved && pathsUri) {
-      cachedSnapshot = await window.api.adaptors.buildSnapshot(store, gamePath);
+      cachedSnapshot = await window.api.adaptors.buildSnapshot(store, gamePath, protonContext);
       cachedPaths = await callAdaptor(name, pathsUri, "paths", [cachedSnapshot]);
       pathsResolved = true;
     }
@@ -592,7 +596,11 @@ function registerAdaptor(context: IExtensionContext, adaptor: AdaptorEntry): voi
           }
 
           // Step 1: Resolve folder paths (game, saves, preferences, etc.)
-          const paths = await getPaths(store, gamePath);
+          const protonContext =
+            discovery.usesProton === true && discovery.winePrefixPath !== undefined
+              ? { usesProton: true, winePrefixPath: discovery.winePrefixPath }
+              : undefined;
+          const paths = await getPaths(store, gamePath, protonContext);
 
           // Step 2: Detect game version (if adaptor declares a strategy)
           const version = await getVersion(paths);

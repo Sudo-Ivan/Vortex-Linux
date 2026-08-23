@@ -297,6 +297,10 @@ export interface ISettingsWorkarounds {
   userSymlinks: boolean;
 }
 
+export interface ISettingsLinux {
+  gogScanRoots: string[];
+}
+
 export interface ISettings {
   interface: ISettingsInterface;
   automation: ISettingsAutomation;
@@ -309,6 +313,7 @@ export interface ISettings {
   tables: ITableStates;
   update: ISettingsUpdate;
   workarounds: ISettingsWorkarounds;
+  linux?: ISettingsLinux;
 }
 
 export interface IStateTransactions {

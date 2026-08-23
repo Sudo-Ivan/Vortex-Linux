@@ -190,6 +190,11 @@ runs:
       working-directory: src/main/dist
       run: npx electron-rebuild
 
+    - name: Make FOMOD native addon relocatable
+      shell: bash
+      working-directory: src/main
+      run: node ./fix-fomod-native-linux.mjs ./dist
+
     - name: Build Linux packages
       shell: bash
       env:
@@ -227,6 +232,21 @@ runs:
         if [[ ! -f ./dist/linux-unpacked/resources/app.asar.unpacked/assets/dotnetprobe ]]; then
           echo "dotnetprobe binary missing from linux-unpacked assets" >&2
           ls -la ./dist/linux-unpacked/resources/app.asar.unpacked/assets/ 2>/dev/null || true
+          exit 1
+        fi
+        fomod_native="$(find ./dist/linux-unpacked/resources/app.asar.unpacked/node_modules/@nexusmods/fomod-installer-native/bin -name 'fomod-installer-native.node' -print -quit)"
+        if [[ -z "${fomod_native}" ]]; then
+          echo "fomod-installer-native.node missing from linux-unpacked package" >&2
+          exit 1
+        fi
+        fomod_so="$(dirname "${fomod_native}")/ModInstaller.Native.so"
+        if [[ ! -f "${fomod_so}" ]]; then
+          echo "ModInstaller.Native.so missing beside packaged fomod addon" >&2
+          exit 1
+        fi
+        if ! readelf -d "${fomod_native}" | grep -q 'RUNPATH.*\$ORIGIN'; then
+          echo "fomod-installer-native.node is missing relocatable RUNPATH" >&2
+          readelf -d "${fomod_native}" | grep -E 'RUNPATH|RPATH' || true
           exit 1
         fi
         if [[ ! -d ./dist/linux-unpacked ]]; then

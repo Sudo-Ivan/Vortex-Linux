@@ -19,6 +19,10 @@ vi.mock("node:fs", () => ({
   readFileSync: vi.fn(),
 }));
 
+vi.mock("../getVortexPath", () => ({
+  getVortexPath: vi.fn(() => "/opt/vortex/resources/app"),
+}));
+
 vi.mock("./desktopIntegration", () => ({
   ensureLinuxDesktopIntegration: vi.fn(),
   shouldInstallLinuxDesktopIntegration: vi.fn(() => true),

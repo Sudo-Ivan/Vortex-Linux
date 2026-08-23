@@ -19,10 +19,12 @@ class GoGLauncherLinux implements types.IGameStore {
   public name: string = STORE_NAME;
   public priority: number = STORE_PRIORITY;
   private mHome: string;
+  private mScanRootsGetter: () => string[];
   private mCache: Bluebird<types.IGameStoreEntry[]>;
 
-  constructor(home: string) {
+  constructor(home: string, scanRootsGetter: () => string[]) {
     this.mHome = home;
+    this.mScanRootsGetter = scanRootsGetter;
   }
 
   public findByName(namePattern: string): Bluebird<types.IGameStoreEntry> {
@@ -129,10 +131,12 @@ class GoGLauncherLinux implements types.IGameStore {
   }
 
   private getGameEntries(): Bluebird<types.IGameStoreEntry[]> {
-    return Bluebird.resolve(discoverLinuxGogGames(this.mHome)).catch((err) => {
-      log("error", "gamestore-gog: failed to discover linux gog games", err);
-      return [];
-    });
+    return Bluebird.resolve(discoverLinuxGogGames(this.mHome, this.mScanRootsGetter())).catch(
+      (err) => {
+        log("error", "gamestore-gog: failed to discover linux gog games", err);
+        return [];
+      },
+    );
   }
 }
 
@@ -319,7 +323,12 @@ function createGameStore(context: types.IExtensionContext): types.IGameStore | u
   }
 
   if (process.platform === "linux") {
-    return new GoGLauncherLinux(util.getVortexPath("home"));
+    return new GoGLauncherLinux(util.getVortexPath("home"), () => {
+      const roots = (
+        context.api.getState() as { settings?: { linux?: { gogScanRoots?: string[] } } }
+      )?.settings?.linux?.gogScanRoots;
+      return Array.isArray(roots) ? roots : [];
+    });
   }
 
   return undefined;

@@ -75,7 +75,6 @@
   "files": [
     "**/*",
     "!node_modules/@nexusmods/fomod-installer-native/prebuilds/**",
-    "!node_modules/@nexusmods/fomod-installer-native/bin/**",
     "!node_modules/@nexusmods/fomod-installer-native/src-native/**",
     "!node_modules/@nexusmods/fomod-installer-native/*.{h,lib,dll}",
     "!node_modules/@nexusmods/fomod-installer-native/build/*.{vcxproj,filters}",
@@ -95,6 +94,7 @@
     "assets/*.exe",
     "assets/css/**",
     "**/*.node",
+    "node_modules/@nexusmods/fomod-installer-native/**",
     "duckdb-extensions"
   ],
   "buildDependenciesFromSource": false,

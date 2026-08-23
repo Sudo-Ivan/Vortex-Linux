@@ -26,6 +26,7 @@ import type { IGameStore } from "../../types/IGameStore";
 import type { NotificationDismiss } from "../../types/INotification";
 import type { IProfile, IRunningTool, IState } from "../../types/IState";
 import type { IEditChoice, ITableAttribute } from "../../types/ITableAttribute";
+import { verifyRequiredFiles } from "../../util/caseAwarePath";
 import { DataInvalid, ProcessCanceled, SetupError, UserCanceled } from "../../util/CustomErrors";
 import * as fs from "../../util/fs";
 import GameStoreHelper from "../../util/GameStoreHelper";
@@ -182,15 +183,9 @@ function refreshGameInfo(store: Redux.Store<IState>, gameId: string): PromiseBB<
 }
 
 function verifyGamePath(game: IGame, gamePath: string): PromiseBB<void> {
-  return PromiseBB.map(game.requiredFiles || [], (file) =>
-    PromiseBB.resolve(fsExtra.stat(path.join(gamePath, file))),
-  )
+  return PromiseBB.resolve(verifyRequiredFiles(gamePath, game.requiredFiles || []))
     .then(() => undefined)
     .catch((err) => {
-      // if the error is anything other than "the file doesn't exist" we assume
-      // the file is there and can't be accessed because of permissions or something.
-      // If the game gets started through the launcher, that may be completely valid
-      // so this isn't the place to report an error.
       if (err.code !== "ENOENT") {
         return undefined;
       }

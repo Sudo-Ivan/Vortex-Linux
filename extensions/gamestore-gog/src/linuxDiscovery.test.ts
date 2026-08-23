@@ -2,7 +2,19 @@ import * as path from "path";
 
 import { describe, expect, test } from "vitest";
 
-import { resolveLaunchPathWithinGame } from "./linuxDiscovery";
+import { collectGogScanRoots, resolveLaunchPathWithinGame } from "./linuxDiscovery";
+
+describe("collectGogScanRoots", () => {
+  test("includes defaults and custom roots without duplicates", () => {
+    const roots = collectGogScanRoots("/home/user", [
+      "/mnt/games",
+      path.join("/home/user", "GOG Games"),
+    ]);
+    expect(roots).toContain(path.join("/home/user", "GOG Games"));
+    expect(roots).toContain("/mnt/games");
+    expect(roots.filter((root) => root === path.join("/home/user", "GOG Games"))).toHaveLength(1);
+  });
+});
 
 describe("resolveLaunchPathWithinGame", () => {
   const gameRoot = "/home/user/GOG Games/TestGame/game";

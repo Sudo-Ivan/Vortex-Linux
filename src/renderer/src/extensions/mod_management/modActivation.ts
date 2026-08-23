@@ -1,7 +1,10 @@
 import * as path from "path";
 
+import turbowalk from "turbowalk";
+
 import { log } from "../../logging";
 import type { IExtensionApi } from "../../types/IExtensionContext";
+import { collectCaseMismatchWarnings } from "../../util/caseAwarePath";
 import { UserCanceled } from "../../util/CustomErrors";
 import * as fs from "../../util/fs";
 import getNormalizeFunc, { type Normalize } from "../../util/getNormalizeFunc";
@@ -30,6 +33,52 @@ async function ensureWritable(api: IExtensionApi, modPath: string): Promise<void
         result.action === "Cancel" ? Promise.reject(new UserCanceled()) : Promise.resolve(),
       ),
   );
+}
+
+async function warnAboutCaseMismatches(
+  api: IExtensionApi,
+  destinationPath: string,
+  installationPath: string,
+  mods: IMod[],
+): Promise<void> {
+  if (process.platform === "win32") {
+    return;
+  }
+
+  const relativePaths: string[] = [];
+  for (const mod of mods) {
+    const modPath = path.join(installationPath, mod.installationPath);
+    try {
+      await turbowalk(
+        modPath,
+        (entries) => {
+          for (const entry of entries) {
+            if (!entry.isDirectory) {
+              relativePaths.push(
+                path.join(mod.installationPath, path.relative(modPath, entry.filePath)),
+              );
+            }
+          }
+        },
+        { skipHidden: false },
+      );
+    } catch {
+      continue;
+    }
+  }
+
+  const warnings = await collectCaseMismatchWarnings(destinationPath, relativePaths.slice(0, 250));
+  if (warnings.length === 0) {
+    return;
+  }
+
+  api.sendNotification({
+    id: "linux-case-sensitivity-warning",
+    type: "warning",
+    message:
+      "Some deployed mod files may not work on a case-sensitive filesystem. " +
+      warnings.slice(0, 2).join(" "),
+  });
 }
 
 /**
@@ -99,6 +148,8 @@ async function deployMods(
       subDir(null),
       new Set<string>(),
     );
+
+    await warnAboutCaseMismatches(api, destinationPath, installationPath, mods);
   } catch (err) {
     if (method.cancel !== undefined) {
       method.cancel(gameId, destinationPath, installationPath);
