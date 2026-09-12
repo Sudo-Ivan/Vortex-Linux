@@ -25,8 +25,8 @@ import type {
 } from "@nexusmods/nexus-api";
 import type Nexus from "@nexusmods/nexus-api";
 import { NexusError, RateLimitError, TimeoutError } from "@nexusmods/nexus-api";
-import { getErrorMessageOrDefault, unknownToError } from "@vortex/shared";
-import { AlreadyDownloaded, DownloadIsHTML } from "@vortex/shared/errors";
+import { getErrorMessageOrDefault, parseError, unknownToError } from "@vortex/shared";
+import { AlreadyDownloaded } from "@vortex/shared/errors";
 import Bluebird from "bluebird";
 import * as semver from "semver";
 
@@ -522,7 +522,13 @@ export function onModUpdate(api: IExtensionApi, nexus: Nexus) {
           api.events.emit("start-install-download", downloadId);
         }
       })
-      .catch(DownloadIsHTML, (err) => undefined)
+      .catch((err: unknown) => {
+        // "DownloadIsHTML": the server answered the file request with a web page
+        // (consent flow, redirect, dead link). Swallow it; the caller has already
+        // emitted the appropriate state change for "no download started".
+        if (parseError(err).data.kind === "download:is-html") return undefined;
+        throw err;
+      })
       .catch(DataInvalid, () => {
         const url = nxmModUrl(game, gameId, modId, fileId);
         api.showErrorNotification("Invalid URL", url, { allowReport: false });
@@ -949,6 +955,32 @@ export function onGetModRequirements(
         // clean bill of health. The caller decides what an incomplete run means.
         return Bluebird.reject(err);
       });
+  };
+}
+
+/**
+ * Fetches endorsement counts for the given mod UIDs in one batched query.
+ * The result is keyed by UID; mods the query cannot resolve are omitted.
+ */
+export function onGetModEndorsementCounts(
+  nexus: Nexus,
+): (uids: string[]) => Bluebird<Record<string, number>> {
+  return (uids: string[]) => {
+    if (uids.length === 0) {
+      return Bluebird.resolve({});
+    }
+
+    return Bluebird.resolve(nexus.modsByUid({ uid: true, endorsements: true }, uids)).then(
+      (mods) => {
+        const result: Record<string, number> = {};
+        for (const mod of mods) {
+          if (mod.uid !== undefined && mod.endorsements !== undefined) {
+            result[mod.uid] = mod.endorsements;
+          }
+        }
+        return result;
+      },
+    );
   };
 }
 

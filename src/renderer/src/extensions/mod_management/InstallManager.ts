@@ -1,5 +1,5 @@
 /**
- * @see AGENTS-COLLECTIONS.md - For collections & phased installation documentation
+ * @see docs/mod-management/collections.md - For collections & phased installation documentation
  */
 
 import * as os from "os";
@@ -12,7 +12,8 @@ import {
   getErrorMessageOrDefault,
   unknownToError,
 } from "@vortex/shared";
-import { AlreadyDownloaded, DownloadIsHTML, InsufficientDiskSpace } from "@vortex/shared/errors";
+import { parseError } from "@vortex/shared";
+import { AlreadyDownloaded, InsufficientDiskSpace } from "@vortex/shared/errors";
 import * as _ from "lodash";
 import type { IHashResult, ILookupResult, IRule } from "modmeta-db";
 import Zip from "node-7z";
@@ -58,7 +59,7 @@ import { generate as shortid } from "shortid";
  * - `deployedPhases` - Phases that have been deployed
  * - `isDeploying` - CRITICAL: Blocks installs during deployment
  *
- * See AGENTS-COLLECTIONS.md for architectural overview.
+ * See docs/mod-management/collections.md for architectural overview.
  */
 import { removeDownload, setDownloadModInfo, startActivity, stopActivity } from "../../actions";
 import {
@@ -93,6 +94,7 @@ import {
   getCollectionSessionById,
   getCollectionStatusBreakdown,
   isCollectionPhaseComplete,
+  isCollectionPhaseSettledSuccessfully,
 } from "../../util/collectionInstallSessionSelectors";
 import { resyncCollectionSessionRules } from "../../util/collectionSessionReconstruct";
 import type { CollectionInstallOutcome } from "../../util/collectionSessionWrite";
@@ -533,7 +535,10 @@ async function mapWithConcurrency<T, R>(
  * @class InstallManager
  */
 class InstallManager {
-  private static readonly MAX_SIMULTANEOUS_INSTALLS = 5;
+  // Exported so other features that fire their own install fan-out (e.g. health check's bulk
+  // install actions) can size their own queue against the same, already-tuned budget instead of
+  // picking an unrelated number.
+  static readonly MAX_SIMULTANEOUS_INSTALLS = 5;
   private mApi: IExtensionApi;
   private mInstallers: IModInstaller[] = [];
   private mGetInstallPath: (gameId: string) => string;
@@ -843,7 +848,12 @@ class InstallManager {
     // requeued, so without this the member stays on "downloading" while rendering "Download failed"
     // - bucketed under the Downloading filter and missed by the Failed filter. Mirrors how
     // handleDownloadSkipped settles a skipped member, then lets the phase advance past it.
-    this.writeCollectionSession(matchingRule.reference, { type: "status", status: "failed" });
+    this.writeCollectionSession(
+      matchingRule.reference,
+      { type: "status", status: "failed" },
+      modRuleId(matchingRule),
+      collectionId,
+    );
     this.maybeAdvancePhase(collectionId, api);
   }
 
@@ -3038,7 +3048,7 @@ class InstallManager {
         const existing = phaseState?.deploymentPromises.get(checkPhase);
         if (existing?.deployOnSettle && !hasDeployed) {
           // CRITICAL: Block new installations during deployment to prevent file conflicts.
-          // Removing this check causes race conditions. See AGENTS-COLLECTIONS.md.
+          // Removing this check causes race conditions. See docs/mod-management/collections.md.
           if (phaseState) {
             phaseState.isDeploying = true;
           }
@@ -3324,11 +3334,13 @@ class InstallManager {
           this.mPendingInstalls.delete(installKey);
           this.mActiveInstalls.delete(installKey);
           // the mod exists with the wanted install spec: settle the member on the session's own
-          // rule, or every poll tick selects it again
-          this.writeCollectionSession(mod.rule.reference, {
-            type: "installed",
-            modId: existingMod.id,
-          });
+          // rule, or every poll tick selects it again.
+          this.writeCollectionSession(
+            mod.rule.reference,
+            { type: "installed", modId: existingMod.id },
+            modRuleId(mod.rule),
+            sourceModId,
+          );
           api.events.emit(
             "did-install-mod",
             gameId,
@@ -5467,7 +5479,7 @@ class InstallManager {
                     return resolve(id);
                   } else if (error instanceof AlreadyDownloaded) {
                     return resolve(error.downloadId);
-                  } else if (error instanceof DownloadIsHTML) {
+                  } else if (parseError(error).data.kind === "download:is-html") {
                     // If this is a google drive link and the file exceeds the
                     //  virus testing limit, Google will return an HTML page asking
                     //  the user for consent to download the file. Lets try this using
@@ -5984,7 +5996,7 @@ class InstallManager {
               );
               return undefined;
             }
-            if (innerErr instanceof DownloadIsHTML) {
+            if (parseError(innerErr).data.kind === "download:is-html") {
               settleMemberFailed();
               const refName = renderModReference(dep.reference, undefined);
               const message =
@@ -6269,15 +6281,18 @@ class InstallManager {
               queuedDownloads.splice(idx, 1);
 
               const errMsg = unknownToError(err).message;
-              const errCode = getErrorCode(err);
+              const parsedErr = parseError(err);
 
-              // Check if this is a network error that might have caused the download to be paused
+              // a failure of the connection itself (which may have paused the download), as
+              // opposed to a refusal by the server
               const isNetworkError =
-                errMsg?.includes("socket hang up") ||
-                errMsg?.includes("ECONNRESET") ||
-                errMsg?.includes("ETIMEDOUT") ||
-                errCode === "ECONNRESET" ||
-                errCode === "ETIMEDOUT";
+                parsedErr.data.kind === "http:generic" ||
+                parsedErr.data.kind === "http:timeout" ||
+                (parsedErr.data.kind === "http:bad-status" && parsedErr.data.statusCode >= 500) ||
+                (parsedErr.data.kind === "os:generic" &&
+                  ["ECONNRESET", "ECONNABORTED", "ETIMEDOUT"].includes(
+                    parsedErr.data.originalCode,
+                  ));
 
               // Check if this is a "File already downloaded" error (for cases where we get a generic error message)
               const isAlreadyDownloaded =
@@ -6672,13 +6687,11 @@ class InstallManager {
           allPhases.add(mod.phase ?? 0);
         });
 
-        // The highest phase whose COMPLETE PREFIX is unbroken - i.e. advance only through
-        // consecutively-complete phases and stop at the first incomplete one. Taking the highest
-        // complete phase anywhere would jump the frontier to the trailing optional phase whenever
-        // its members are all ignored (terminal) while a required phase is still pending.
+        // The highest phase whose COMPLETE PREFIX is unbroken.
+        // A failed required member breaks the prefix and its retry runs at its own phase.
         let highestCompletedPhase = -1;
         for (const phase of Array.from(allPhases).sort((a, b) => a - b)) {
-          if (!isCollectionPhaseComplete(api.getState(), phase)) {
+          if (!isCollectionPhaseSettledSuccessfully(api.getState(), phase)) {
             break;
           }
           highestCompletedPhase = phase;
@@ -6690,7 +6703,7 @@ class InstallManager {
         const rules = api.getState().persistent.mods[gameId]?.[sourceModId]?.rules ?? [];
         const nextPhaseAfterCompleted =
           this.mPhaseTracker.phaseSet(sourceModId, rules).find((p) => p > highestCompletedPhase) ??
-          highestCompletedPhase + 1;
+          highestCompletedPhase;
         const effectiveStartPhase = Math.max(lowestPhase, nextPhaseAfterCompleted);
 
         if (
@@ -7730,9 +7743,7 @@ class InstallManager {
   }
 
   /**
-   * Report a lifecycle outcome that named no session member: that member keeps its status and the
-   * completion poll goes on selecting it. Writes outside an install, and writes the planner
-   * declined for a member it did match, are expected and stay quiet.
+   * Report a lifecycle outcome that named no session member.
    */
   private warnUnmatchedSessionWrite(
     reference: IModReference,
@@ -7740,6 +7751,9 @@ class InstallManager {
     ruleId?: string,
     sourceModId?: string,
   ): void {
+    if (ruleId === undefined) {
+      return;
+    }
     const session = getCollectionActiveSession(this.mApi.getState());
     if (session === undefined) {
       return;
@@ -7747,7 +7761,7 @@ class InstallManager {
     if (sourceModId !== undefined && sourceModId !== session.collectionId) {
       return;
     }
-    if (ruleId !== undefined && session.mods[ruleId] !== undefined) {
+    if (session.mods[ruleId] !== undefined) {
       return;
     }
     if (matchSessionRuleEntry(session, reference) !== undefined) {

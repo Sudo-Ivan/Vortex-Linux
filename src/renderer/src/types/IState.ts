@@ -2,15 +2,17 @@ import type { EndorsedStatus, ICollection, IRevision } from "@nexusmods/nexus-ap
 import type { IParameters } from "@vortex/shared/cli";
 import type { DownloadCheckpoint } from "@vortex/shared/download";
 
-import type { ICategoryDictionary } from "../extensions/category_management/types/ICategoryDictionary";
-import type { IDownload } from "../extensions/download_management/types/IDownload";
-import type { IDiscoveryResult } from "../extensions/gamemode_management/types/IDiscoveryResult";
-import type { IGameStored } from "../extensions/gamemode_management/types/IGameStored";
-import type { IHealthCheckPersistentState } from "../extensions/health_check/reducers/persistent";
-import type { IHealthCheckSessionState } from "../extensions/health_check/reducers/session";
-import type { IHistoryPersistent, IHistoryState } from "../extensions/history_management/reducers";
-import type { IMod } from "../extensions/mod_management/types/IMod";
-import type { IProfile } from "../extensions/profile_management/types/IProfile";
+import type { ICategoryDictionary } from "@/extensions/category_management/types/ICategoryDictionary";
+import type { IDownload } from "@/extensions/download_management/types/IDownload";
+import type { IDiscoveryResult } from "@/extensions/gamemode_management/types/IDiscoveryResult";
+import type { IGameStored } from "@/extensions/gamemode_management/types/IGameStored";
+import type { IHealthCheckPersistentState } from "@/extensions/health_check/reducers/persistent";
+import type { IHealthCheckSessionState } from "@/extensions/health_check/reducers/session";
+import type { IHistoryPersistent, IHistoryState } from "@/extensions/history_management/reducers";
+import type { IMod } from "@/extensions/mod_management/types/IMod";
+import type { IProfile } from "@/extensions/profile_management/types/IProfile";
+import type { IUpdaterSessionState } from "@/extensions/updater/reducers";
+
 import type { ICollectionInstallState } from "./collections/ICollectionInstallSession";
 import type { ExtensionType, IAvailableExtension, IExtension } from "./extensions";
 import type { IAttributeState } from "./IAttributeState";
@@ -175,6 +177,8 @@ export interface IApp {
   extensions: { [id: string]: IExtensionState };
   warnedAdmin: number;
   installType: VortexInstallType;
+  /** Whether the updater runs at all. Decided in main, see isUpdaterActive. */
+  updaterActive: boolean;
   migrations: string[];
 }
 
@@ -191,6 +195,15 @@ export interface IUser {
 
 export interface ITableStates {
   [id: string]: ITableState;
+}
+
+/** What the user pinned to, or took off, one toolbar — keyed by action id. */
+export interface IToolbarState {
+  pinned: { [actionId: string]: boolean };
+}
+
+export interface IToolbarStates {
+  [toolbarId: string]: IToolbarState;
 }
 
 export interface IStateDownloads {
@@ -213,6 +226,8 @@ export interface ISettingsInterface {
   desktopNotifications: boolean;
   hideTopLevelCategory: boolean;
   relativeTimes: boolean;
+  alwaysCompactHeaders: boolean;
+  reduceMotion?: boolean;
   dashboardLayout: string[];
   foregroundDL: boolean;
   dashletSettings: { [dashletId: string]: IDashletSettings };
@@ -283,11 +298,19 @@ export interface ISettingsNotification {
   suppress: { [notificationId: string]: boolean };
 }
 
-export const UPDATE_CHANNELS = ["stable", "beta", "next", "none"] as const;
+export const UPDATE_CHANNELS = ["stable", "beta", "none"] as const;
 
 type ValuesOf<T extends readonly any[]> = T[number];
 
 export type UpdateChannel = ValuesOf<typeof UPDATE_CHANNELS>;
+
+/**
+ * Persisted state may still hold a retired channel: "next" existed for years and was only ever
+ * a second name for beta. Anything unrecognised reads as stable rather than being passed on.
+ */
+export function toUpdateChannel(value: unknown): UpdateChannel {
+  return UPDATE_CHANNELS.includes(value as UpdateChannel) ? (value as UpdateChannel) : "stable";
+}
 
 export interface ISettingsUpdate {
   channel: UpdateChannel;
@@ -325,6 +348,7 @@ export interface ISettings {
   mods: ISettingsMods;
   notifications: ISettingsNotification;
   tables: ITableStates;
+  toolbars: IToolbarStates;
   update: ISettingsUpdate;
   workarounds: ISettingsWorkarounds;
   linux?: ISettingsLinux;
@@ -346,6 +370,7 @@ export interface ISessionGameMode {
   known: IGameStored[];
   addDialogVisible: boolean;
   disabled: { [gameId: string]: string };
+  showHidden: boolean;
 }
 
 export interface IGameInfoEntry {
@@ -428,6 +453,7 @@ export interface ISessionState {
   history: IHistoryState;
   overlays: IOverlaysState;
   healthCheck: IHealthCheckSessionState;
+  updater: IUpdaterSessionState;
 }
 
 export interface IState {

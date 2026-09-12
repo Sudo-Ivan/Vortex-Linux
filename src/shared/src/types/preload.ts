@@ -1,3 +1,5 @@
+import type { FileSystem } from "@nexusmods/adaptor-api/fs";
+
 import type { SerializedSpan } from "../telemetry/types";
 import type {
   BrowserViewConstructorOptions,
@@ -25,7 +27,7 @@ import type {
   LinuxDesktopRepairResult,
   LinuxSystemHealthReport,
   Serializable,
-  UpdateStatus,
+  UpdaterStatusResponse,
   VortexPaths,
   WireDownloadCheckpoint,
   WireDownloadState,
@@ -123,7 +125,12 @@ export interface Api {
 
   /** Feature flags API */
   featureFlags: FeatureFlagsApi;
+
+  /** Filesystem API */
+  fs: BetterOmit<FileSystem, "enumerateDirectory" | "createStream" | "readFile" | "writeFile">;
 }
+
+type BetterOmit<T, K extends keyof T> = { [P in Exclude<keyof T, K>]: T[P] };
 
 export interface Example {
   /** pong */
@@ -137,7 +144,7 @@ export interface Shell {
   /** Opens the file using the default application for the file extension */
   openFile(filePath: string): void;
 
-  /** Reveals the file in its parent folder using the OS file manager */
+  /** Opens the file explorer with the file selected */
   showItemInFolder(filePath: string): void;
 }
 
@@ -464,9 +471,18 @@ export interface AdaptorsApi {
 /** API for querying update status from main process */
 export interface UpdaterApi {
   /**
-   * Get current update status from main process.
+   * Read the updater's status from main. The renderer polls this; with
+   * `since` (the last seen sequence number) the reply includes every
+   * snapshot recorded after it, in order.
    */
-  getStatus(): Promise<UpdateStatus>;
+  getStatus(since?: number): Promise<UpdaterStatusResponse>;
+
+  /**
+   * Release notes covering the update the app just went through. Null when
+   * this launch did not follow an update or the notes are unavailable.
+   * Takes the renderer's persisted update channel.
+   */
+  getUpdateChangelog(channel: string): Promise<string | null>;
 
   /**
    * Set the update channel and trigger an update check.
@@ -488,6 +504,23 @@ export interface UpdaterApi {
    * Trigger restart and install of the downloaded update.
    */
   restartAndInstall(): void;
+
+  /**
+   * Download the downgrade offered after an explicit switch to stable.
+   * Ignored by main unless a downgrade offer is outstanding.
+   */
+  downloadDowngrade(installAfterDownload?: boolean): void;
+
+  /**
+   * Decline the outstanding downgrade offer. Clears it; only another
+   * purposeful switch to stable raises it again.
+   */
+  declineDowngrade(): void;
+
+  /**
+   * Cancel the download in progress. Ignored by main unless one is running.
+   */
+  cancelDownload(): void;
 }
 
 /** API for Linux integration health checks */

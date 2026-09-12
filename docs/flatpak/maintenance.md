@@ -30,8 +30,8 @@ Manifest: `flatpak/com.nexusmods.vortex.prebuilt.yaml`
 > - [Flatpak Builder Tools PR 511]
 > - [Flatpak Builder Tools issue 383]
 
-> [!note] Prerequisites
-> See [Flatpak packaging] for the basics and
+> [!NOTE]
+> **Prerequisites:** see [Flatpak packaging] for the basics and
 > first-time setup.
 
 ## Helper Scripts
@@ -39,7 +39,7 @@ Manifest: `flatpak/com.nexusmods.vortex.prebuilt.yaml`
 Scripts in `flatpak/scripts/` automate common tasks. They manage their own
 virtual environment and can run from any directory.
 
-> [!tip]
+> [!TIP]
 > Use `python` instead if `python3` does not work on your system.
 
 ### Prebuilt release workflow

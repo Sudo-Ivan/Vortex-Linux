@@ -76,6 +76,7 @@ import type {
   ICollectionInstallState,
   ICollectionModInstallInfo,
 } from "../types/collections/ICollectionInstallSession";
+import type { IAvailableExtension } from "../types/extensions";
 import type { DialogActions, DialogType, IDialogContent, IDialogResult } from "../types/IDialog";
 import type { IExtensionApi } from "../types/IExtensionContext";
 import type { IGame } from "../types/IGame";
@@ -552,6 +553,8 @@ const modsReducers = modsReducer.reducers as Record<
   string,
   (state: ModsSlice, payload: unknown) => ModsSlice
 >;
+// the real download reducer, applied to state.persistent.downloads, so writes onto a download's
+// modInfo (the collection-rule tags the install path records) are observable by read-back
 const downloadReducers = downloadStateReducer.reducers as Record<
   string,
   (state: IState["persistent"]["downloads"], payload: unknown) => IState["persistent"]["downloads"]
@@ -597,12 +600,6 @@ function makeDriverState(overrides: Partial<IDriverHarnessState> = {}): IState {
       // as-unknown-as-IState below covers the omitted fields)
       mods: { installPath: {} },
       profiles: { activeProfileId: undefined, nextProfileId: undefined, lastActiveProfile: {} },
-      nexus: {
-        fork: {
-          disablePremiumGates: false,
-          autoResolveDependencies: false,
-        },
-      },
     },
   } as unknown as IState;
 }
@@ -882,6 +879,11 @@ export function makeInstallManagerHarness(
   return { manager, phaseTracker, ...base };
 }
 
+/**
+ * Typed handle on the private InstallManager members phase-engine suites drive (the phase walk, the
+ * requeue pass, the completion poll). The single cast site for them, so suites state which member
+ * they drive rather than each casting the manager.
+ */
 export function managerInternals(manager: InstallManager): IManagerInternals {
   return manager as unknown as IManagerInternals;
 }
@@ -1171,6 +1173,22 @@ export function makeLegacyExtensionState(
   overrides: Partial<IExtensionState> = {},
 ): IExtensionState {
   return { enabled: false, ...overrides } as IExtensionState;
+}
+
+/** A catalog entry as the extensions endpoint mapping produces it. */
+export function makeAvailableExtension(
+  overrides: Partial<IAvailableExtension> = {},
+): IAvailableExtension {
+  return {
+    name: "Test Extension",
+    modId: 0,
+    fileId: 0,
+    author: "Test Author",
+    version: "1.0.0",
+    timestamp: 0,
+    image: "image.png",
+    ...overrides,
+  };
 }
 
 let loEntrySeq = 0;

@@ -107,7 +107,7 @@ python3 flatpak/scripts/flatpak_bundle_prebuilt.py \
   --output dist/vortex-<version>.flatpak
 ```
 
-More detail: [CONTRIBUTE.md](CONTRIBUTE.md), [docs/packaging/flatpak.md](docs/packaging/flatpak.md), distro guides under `docs/install-instructions/`.
+More detail: [CONTRIBUTING.md](CONTRIBUTING.md), [docs/packaging/flatpak.md](docs/packaging/flatpak.md), distro guides under `docs/install-instructions/`.
 
 ### Upstream Windows builds
 
@@ -149,7 +149,16 @@ After a merge, re-check fork-owned paths:
 - **Linux packaging / Flatpak / this fork's CI:** open issues and PRs on [Sudo-Ivan/Vortex-Linux](https://github.com/Sudo-Ivan/Vortex-Linux/issues)
 - **General Vortex bugs and features:** prefer upstream [Nexus-Mods/Vortex](https://github.com/Nexus-Mods/Vortex/issues) when the issue is not Linux-packaging specific
 
-Setup and local development: [CONTRIBUTE.md](CONTRIBUTE.md).
+Setup and local development: [CONTRIBUTING.md](CONTRIBUTING.md).
+
+- Bug Report: If you see an error message or encounter an issue while using our application, please create a [bug report](https://github.com/Sudo-Ivan/Vortex-Linux/issues/new) for Linux packaging, or prefer [upstream](https://github.com/Nexus-Mods/Vortex/issues/new?assignees=&labels=&projects=&template=bug_report.md&title=) for general Vortex bugs.
+- Feature Request: For general product ideas, please submit a [feature request](https://github.com/Nexus-Mods/Vortex/issues/new?assignees=&labels=&projects=&template=feature_request.md&title=) upstream.
+- Review Extension: If you're creating a game extension and need us to review it, please submit a [review extension](https://github.com/Nexus-Mods/Vortex/issues/new?assignees=&labels=extension+%3Agear%3A&projects=&template=review-extension.yaml&title=Review%3A+Game+Name) request upstream.
+- Pull Request: Read [CONTRIBUTING.md](CONTRIBUTING.md) first. For Linux packaging / Flatpak / fork CI, open PRs here. For general Vortex changes, prefer upstream.
+
+## Developing
+
+To build and run Vortex from source, start with [CONTRIBUTING.md](./CONTRIBUTING.md). It covers setup for each platform, the build/run/hot-reload workflow, debugging, and packaging. Deeper guides (debugging, packaging, the auto-updater, release process) are indexed in [docs/README.md](./docs/README.md).
 
 ## License
 

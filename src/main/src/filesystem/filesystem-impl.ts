@@ -171,24 +171,49 @@ function wrapIterator(
     async next() {
       const step = await inner.next();
       if (step.done === true) return { done: true, value: undefined };
-      if (includeStatus) {
-        const [native, status] = step.value as readonly [ResolvedPath, Status];
+
+      const value = step.value;
+      if (typeof value === "string") {
+        if (includeStatus)
+          throw new VortexError(
+            "Expected inner iterator to include status but received only paths",
+            { kind: "argument-invalid", argument: "includeStatus" },
+          );
+
+        return {
+          done: false,
+          value: toQualifiedEntry(rootQP, rootResolved, value),
+        };
+      } else {
+        if (!includeStatus)
+          throw new VortexError(
+            "Expected inner iterator to only provide paths but received status as well",
+            { kind: "argument-invalid", argument: "includeStatus" },
+          );
+
+        const [native, status] = value;
         return {
           done: false,
           value: [toQualifiedEntry(rootQP, rootResolved, native), status],
         };
       }
-      return {
-        done: false,
-        value: toQualifiedEntry(rootQP, rootResolved, step.value as ResolvedPath),
-      };
     },
     async return() {
-      await inner.return?.(undefined).catch(() => undefined);
+      try {
+        await inner.return?.(undefined);
+      } catch {
+        // ignored
+      }
+
       return { done: true, value: undefined };
     },
     async throw(err) {
-      await inner.return?.(undefined).catch(() => undefined);
+      try {
+        await inner.return?.(undefined);
+      } catch {
+        // ignored
+      }
+
       throw err;
     },
   };
@@ -201,7 +226,7 @@ function wrapIterator(
  * check is separator-aware (handles Windows case-insensitivity and does not
  * match `/tmp/a` against `/tmp/abc/...`).
  *
- * Throws a {@link FileSystemError} with code `generic` if the entry is not
+ * Throws a `VortexError` with kind `argument-invalid` if the entry is not
  * under the root (e.g. a symlink followed out of the tree). Node's
  * `opendir({ recursive: true })` does not follow symlinks, so this is a
  * defensive check rather than an expected case.

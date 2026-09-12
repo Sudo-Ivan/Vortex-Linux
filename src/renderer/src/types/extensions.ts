@@ -65,40 +65,35 @@ export type IExtensionWithState = IExtensionState & {
 export interface IExtensionDownloadInfo {
   name: string;
   modId: number;
-  fileId: number;
+  // game stubs and bare nxm://site/mods/<id> links only know the mod; resolved from the catalog
+  fileId?: number;
 }
 
 /**
- * information about an extension available on the central extension list
+ * Extension available from the Nexus Mods extensions endpoint. Internal model;
+ * the wire format is private to extension_manager/availableExtensions.ts.
  */
 export interface IAvailableExtension {
   name: string;
   modId: number;
   fileId: number;
-  description: {
-    short: string;
-    long: string;
-  };
-  id?: string;
-  type?: ExtensionType;
-  language?: string;
-  gameName?: string;
-  gameId?: string;
-  image: string;
+  /** username of the uploader */
   author: string;
-  uploader: string;
   version: string;
-  downloads: number;
-  endorsements: number;
+  /** upload time of the current file, epoch milliseconds */
   timestamp: number;
-  tags: string[];
-  dependencies?: { [key: string]: any };
-  hide?: boolean;
-}
-
-export interface IExtensionManifest {
-  last_updated: number;
-  extensions: IAvailableExtension[];
+  /** mod page image, or the game artwork for game extensions */
+  image?: string;
+  /** undefined for extensions that don't target a game (tools, site extensions) */
+  type?: ExtensionType;
+  /** numeric Nexus Mods game ID, game extensions only */
+  gameId?: number;
+  /** game domain name, resolved from the local Nexus games list */
+  gameDomain?: string;
+  /** game display name, resolved from the local Nexus games list */
+  gameName?: string;
+  /** BCP 47 locale code, translations only */
+  language?: string;
 }
 
 export interface ISelector {

@@ -2,7 +2,7 @@ import { mkdirSync, statSync } from "node:fs";
 import { readFile, writeFile, rm, stat } from "node:fs/promises";
 import path from "node:path";
 
-import { getErrorCode, getErrorMessageOrDefault, unknownToError } from "@vortex/shared";
+import { getErrorCode, getErrorMessageOrDefault, parseError, unknownToError } from "@vortex/shared";
 import type { IParameters, ISetItem } from "@vortex/shared/cli";
 import {
   DataInvalid,
@@ -26,20 +26,23 @@ import winapi from "winapi-bindings";
 import { shutdownBsdiffWorker } from "./bsdiff/host";
 import { parseCommandline, updateStartupSettings } from "./cli";
 import { installDevelExtensions } from "./devel";
-import { terminate, terminateAsync } from "./errorHandling";
+import { isQuitting, markQuitting, terminate, terminateAsync } from "./errorHandling";
 import { disableErrorReporting, reportCrash } from "./errorReporting";
 import { setupMainExtensions } from "./extensions";
+import { isUpdaterActive } from "./extensions/updater";
 import { validateFiles } from "./fileValidation";
 import { getVortexPath, setVortexPath } from "./getVortexPath";
 import { shutdownHashWorker } from "./hash/host";
+import { betterIpcMain } from "./ipc";
 import { ensureLinuxDesktopIntegration } from "./linux/desktopIntegration";
 import { log, setupLogging, changeLogPath } from "./logging";
 import MainWindow from "./MainWindow";
+import { ReloadBudget } from "./reloadBudget";
 import SplashScreen from "./SplashScreen";
 import DuckDBSingleton from "./store/DuckDBSingleton";
 import { flattenState } from "./store/flattenState";
 import { healInvalidKeys } from "./store/healInvalidKeys";
-import LevelPersist, { DatabaseLocked, DatabaseOpenError } from "./store/LevelPersist";
+import LevelPersist from "./store/LevelPersist";
 import {
   initMainPersistence,
   readPersistedValue,
@@ -65,6 +68,10 @@ export function isMajorDowngrade(previous: string, current: string): boolean {
     return semver.minor(previous) > semver.minor(current);
   }
 }
+
+// a helper that dies on every relaunch tells us everything with the first few
+const MAX_PROCESS_GONE_REPORTS = 3;
+const PROCESS_GONE_REPORT_WINDOW_MS = 60_000;
 
 class Application {
   public static shouldIgnoreError(error: unknown, promise?: unknown): boolean {
@@ -125,6 +132,7 @@ class Application {
   private mAppMetadata: AppInitMetadata | undefined;
   private mFirstStart: boolean = false;
   private mStartupLogPath: string;
+  private mProcessGoneReports = new Map<string, ReloadBudget>();
 
   constructor(args: IParameters) {
     this.mArgs = args;
@@ -200,6 +208,8 @@ class Application {
   }
 
   private setupAppEvents(args: IParameters): void {
+    app.on("before-quit", () => markQuitting());
+
     app.on("window-all-closed", () => {
       log("info", "Vortex closing");
       finalizeMainWrite()
@@ -247,7 +257,11 @@ class Application {
       });
 
       // GPU/utility crashes never reach the JS error handlers
-      if (!["clean-exit", "killed"].includes(details.reason)) {
+      if (
+        !["clean-exit", "killed"].includes(details.reason) &&
+        !isQuitting() &&
+        this.allowProcessGoneReport(`${details.type}:${details.reason}:${details.exitCode}`)
+      ) {
         reportCrash(
           "ChildProcessGone",
           {
@@ -320,8 +334,15 @@ class Application {
       contents.on("will-attach-webview", this.attachWebView);
     });
 
-    // Enable F12 to toggle DevTools in all builds
     app.on("browser-window-created", (_, window) => {
+      // The session is being ended, so we should not try to relaunch Vortex
+      window.on("session-end", (event) => {
+        log("info", "Windows session ending", { reasons: event.reasons });
+        markQuitting();
+        app.quit();
+      });
+
+      // Enable F12 to toggle DevTools in all builds
       const { webContents } = window;
       webContents.on("before-input-event", (_, input) => {
         if (input.type !== "keyDown") return;
@@ -366,6 +387,7 @@ class Application {
       await this.regularStartInner(args);
     } catch (err) {
       log("error", "quitting with exception", getErrorMessageOrDefault(err));
+      const parsed = parseError(err);
 
       if (err instanceof UserCanceled) {
         // UserCanceled is thrown by terminate() to unwind the stack.
@@ -394,7 +416,7 @@ class Application {
         }
 
         app.quit();
-      } else if (err instanceof DatabaseLocked) {
+      } else if (parsed.data.kind === "database:locked") {
         dialog.showErrorBox(
           "Startup failed",
           "Vortex seems to be running already. " +
@@ -402,13 +424,13 @@ class Application {
         );
 
         app.quit();
-      } else if (err instanceof DatabaseOpenError) {
+      } else if (parsed.data.kind === "database:open-failed") {
         dialog.showErrorBox(
           "Startup failed",
           `Vortex couldn't open its application database at:\n\n` +
-            `${err.path}\n\n` +
-            `Underlying error: ${err.cause}\n\n` +
-            `This is not a "database locked" condition — a different problem is preventing the database from opening. ` +
+            `${parsed.data.path}\n\n` +
+            `Underlying error: ${getErrorMessageOrDefault(parsed.cause)}\n\n` +
+            `This is not a "database locked" condition - a different problem is preventing the database from opening. ` +
             `Check that the path is accessible, the drive isn't full or read-only, and that no antivirus is quarantining files in that folder.`,
         );
 
@@ -507,6 +529,9 @@ class Application {
     // fetches it via getInitMetadata() early in its boot.
     log("debug", "checking how Vortex was installed");
     await this.identifyInstallType();
+    // the renderer's updater extension gates on this; it cannot work it out itself because
+    // VORTEX_DEV_UPDATER is read at runtime and only NODE_ENV is inlined into its bundle
+    this.mAppMetadata!.updaterActive = isUpdaterActive(this.mAppMetadata!.installType ?? "");
     this.mAppMetadata!.version = app.getVersion();
 
     log("debug", "checking if migration is required");
@@ -663,6 +688,24 @@ class Application {
     }
 
     if (isMajorDowngrade(lastVersion, currentVersion)) {
+      // A downgrade the user explicitly confirmed through the updater's
+      // channel-switch flow sets a one-shot marker; don't warn about it.
+      // "" is the cleared sentinel: the persistence layer stores it as '""',
+      // which readPersistedValue parses back to "" and the guard below skips.
+      const expectedDowngrade = await readPersistedValue<string>("app", ["expectedDowngradeTo"]);
+      if (expectedDowngrade != null && expectedDowngrade !== "") {
+        await writePersistedValue("app", ["expectedDowngradeTo"], "");
+      }
+      if (expectedDowngrade === currentVersion) {
+        log("info", "Expected downgrade detected, skipping warning", {
+          from: lastVersion,
+          to: currentVersion,
+        });
+        // Returning here also bypasses the update-migration branch below,
+        // which is correct: a downgrade can never satisfy its gt() condition.
+        return;
+      }
+
       const res = await this.showDialog({
         type: "warning",
         title: "Downgrade detected",
@@ -835,6 +878,15 @@ class Application {
     log("info", "state backup imported");
   }
 
+  private allowProcessGoneReport(kind: string): boolean {
+    let budget = this.mProcessGoneReports.get(kind);
+    if (budget === undefined) {
+      budget = new ReloadBudget(MAX_PROCESS_GONE_REPORTS, PROCESS_GONE_REPORT_WINDOW_MS);
+      this.mProcessGoneReports.set(kind, budget);
+    }
+    return budget.allow();
+  }
+
   private multiUserPath() {
     if (process.platform === "win32" && process.env.ProgramData !== undefined) {
       const muPath = path.join(process.env.ProgramData, "vortex");
@@ -875,8 +927,11 @@ class Application {
     };
 
     // Register handler so renderer can request metadata via invoke (avoids
-    // race conditions with the fire-and-forget app:init send pattern)
-    ipcMain.handle("app:getInitMetadata", () => this.mAppMetadata);
+    // race conditions with the fire-and-forget app:init send pattern).
+    // Clear handler first to avoid duplicate registration if setupPersistence()
+    // is called more than once (e.g. after a repair).
+    ipcMain.removeHandler("app:getInitMetadata");
+    betterIpcMain.handle("app:getInitMetadata", () => this.mAppMetadata!);
 
     // 1. Create LevelPersist for the base path
     const levelPersistor = await LevelPersist.create(

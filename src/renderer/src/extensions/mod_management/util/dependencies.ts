@@ -529,6 +529,11 @@ function gatherDependencies(
         )
           .then((node: IDependencyNode) => {
             onProgress();
+            if (node !== null) {
+              // only these top-level rules are collection members, so only their nodes address a
+              // session entry; the sub-dependencies gathered under them carry no key
+              node.sessionRuleId = modRuleId(rule);
+            }
             return Promise.resolve(node);
           })
           .catch((err) => {

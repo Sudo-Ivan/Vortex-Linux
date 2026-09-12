@@ -6,6 +6,7 @@ import {
   FloatingPortal,
   limitShift,
   offset,
+  type OpenChangeReason,
   type Placement,
   safePolygon,
   shift,
@@ -31,6 +32,11 @@ import React, {
   useState,
 } from "react";
 
+import {
+  OVERLAY_ARROW_HEIGHT,
+  OVERLAY_ARROW_STROKE_WIDTH,
+  OVERLAY_ARROW_WIDTH,
+} from "@/ui/components/overlay_arrow/OverlayArrow";
 import { joinClasses } from "@/ui/utils/joinClasses";
 import type { XOr } from "@/ui/utils/types";
 
@@ -42,12 +48,8 @@ const TRIGGER_GAP = 8;
 const COLLISION_PADDING = 8;
 /** Floor for the reported height, so a cramped corner scrolls rather than collapses. */
 const MIN_AVAILABLE_HEIGHT = 96;
-const ARROW_HEIGHT = 8;
-const ARROW_WIDTH = 12;
 /** Keeps the arrow off the tooltip's rounded corners. */
 const ARROW_PADDING = 8;
-/** FloatingArrow doubles and clips this, so 1 renders as a 1px edge. */
-const ARROW_STROKE_WIDTH = 1;
 const TRANSITION_MS = 30;
 
 export type ITooltipPlacement = Placement;
@@ -64,9 +66,18 @@ interface ITooltipBaseProps {
   disabled?: boolean;
   /** Lets the pointer travel into the tooltip and use its content. */
   interactive?: boolean;
+  /** Controlled open state. Omit to let hover and focus own it. */
+  open?: boolean;
+  /**
+   * For a tooltip that shows itself rather than answering a hover: a press anywhere, or a
+   * neighbour in the same delay group opening, leaves it up. Escape still closes it.
+   */
+  persistent?: boolean;
   /** Preferred side. Flips and slides automatically when it would overflow. */
   placement?: ITooltipPlacement;
   showArrow?: boolean;
+  /** Every open and close, with Floating UI's reason for it. */
+  onOpenChange?: (open: boolean, reason?: OpenChangeReason) => void;
 }
 
 export type ITooltipProps = ITooltipBaseProps &
@@ -84,18 +95,57 @@ export const Tooltip = ({
   delay = { close: 50, open: 250 },
   disabled = false,
   interactive = false,
+  open: controlledOpen,
+  persistent = false,
   placement = "top",
   showArrow = true,
+  onOpenChange,
 }: ITooltipProps) => {
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = controlledOpen ?? uncontrolledOpen;
+
+  const setOpen = (next: boolean, reason?: OpenChangeReason) => {
+    setUncontrolledOpen(next);
+    onOpenChange?.(next, reason);
+  };
+
+  // Disabling unregisters the trigger as Floating UI's reference, so a tooltip left open
+  // across it would come back unplaced — in the window's corner — once re-enabled.
+  const [wasDisabled, setWasDisabled] = useState(disabled);
+
+  if (disabled !== wasDisabled) {
+    setWasDisabled(disabled);
+
+    if (disabled) {
+      setUncontrolledOpen(false);
+    }
+  }
+
   const arrowRef = useRef<SVGSVGElement>(null);
+  const referenceRef = useRef<HTMLElement | null>(null);
+
+  // Headless UI refocuses its own trigger when its panel closes and the browser calls that
+  // :focus-visible, so only its data-focus — React Aria's modality tracking — means keyboard.
+  const handleOpenChange = (next: boolean, _event?: Event, reason?: OpenChangeReason) => {
+    const element = referenceRef.current;
+
+    if (
+      next &&
+      reason === "focus" &&
+      element?.hasAttribute("data-headlessui-state") === true &&
+      !element.hasAttribute("data-focus")
+    ) {
+      return;
+    }
+
+    setOpen(next, reason);
+  };
 
   const { context, floatingStyles, refs } = useFloating({
     middleware: [
-      offset(showArrow ? TRIGGER_GAP + ARROW_HEIGHT : TRIGGER_GAP),
-      // Swap sides rather than overflow. crossAxis is off so shift handles the
-      // other axis — otherwise a trigger near an edge flips to an unasked-for
-      // side when sliding a pixel would have done.
+      offset(showArrow ? TRIGGER_GAP + OVERLAY_ARROW_HEIGHT : TRIGGER_GAP),
+      // Swap sides rather than overflow. crossAxis off so shift handles the other axis,
+      // or a trigger near an edge flips to an unasked-for side when a nudge would do.
       flip({ crossAxis: false, fallbackAxisSideDirection: "start", padding: COLLISION_PADDING }),
       // Slide along the edge; limitShift stops it detaching from the trigger.
       shift({ limiter: limitShift(), padding: COLLISION_PADDING }),
@@ -124,13 +174,14 @@ export const Tooltip = ({
     ],
     open,
     placement,
-    onOpenChange: setOpen,
+    onOpenChange: handleOpenChange,
     whileElementsMounted: autoUpdate,
   });
 
   // Inside a TooltipDelayGroup the group owns the timing once something is open,
   // so moving along a row swaps instantly. Standalone, currentId stays null.
-  const groupContext = useDelayGroup(context);
+  // A persistent tooltip leaves the group, which closes whichever member is not current.
+  const groupContext = useDelayGroup(context, { enabled: !disabled && !persistent });
   const hoverDelay = groupContext.currentId === null ? delay : groupContext.delay;
 
   const { isMounted, styles: transitionStyles } = useTransitionStyles(context, {
@@ -140,28 +191,34 @@ export const Tooltip = ({
     initial: { opacity: 0, transform: "scale(0.90)" },
   });
 
+  // A disabled tooltip that still listened would claim the delay group and close the real one.
   const interactions = useInteractions([
     useHover(context, {
       delay: hoverDelay,
+      enabled: !disabled,
       handleClose: interactive ? safePolygon({ blockPointerEvents: false }) : null,
       // Enter only, or nudging the pointer reopens what Escape just dismissed.
       move: false,
     }),
-    useFocus(context),
-    useDismiss(context),
+    useFocus(context, { enabled: !disabled }),
+    // Escape stays either way: a tooltip with no way to dismiss it is a trap.
+    useDismiss(context, { enabled: !disabled, outsidePress: !persistent }),
     useRole(context, { role: "tooltip" }),
   ]);
 
   // `ref` isn't on ReactElement until React 19, and isValidElement leaves `props` as
   // any, so pin both once here. Merging refs keeps any the caller set on the trigger.
   const trigger = children as ReactElement<Record<string, unknown>> & { ref?: Ref<unknown> };
-  const triggerRef = useMergeRefs([refs.setReference, trigger.ref]);
+  const triggerRef = useMergeRefs([refs.setReference, referenceRef, trigger.ref]);
 
-  // Guarded despite the types, so `content={maybeUndefined}` gives a bare trigger.
+  // Guarded despite the types, so an absent or empty body gives a bare trigger.
   const body = customContent ?? content;
 
-  if (disabled || !isValidElement(children) || body === null || body === undefined) {
-    return children;
+  if (disabled || !isValidElement(children) || !body) {
+    // Kept as the reference so a tooltip re-enabled mid-close has somewhere to be placed.
+    // cloneElement is the only way to put a ref on a caller's element before React 19.
+    // eslint-disable-next-line @eslint-react/no-clone-element
+    return isValidElement(children) ? cloneElement(trigger, { ref: triggerRef }) : children;
   }
 
   const referenceProps = interactions.getReferenceProps({ ref: triggerRef, ...trigger.props });
@@ -172,11 +229,18 @@ export const Tooltip = ({
     (
       referenceProps.onPointerDown as ((event: ReactPointerEvent<HTMLElement>) => void) | undefined
     )?.(event);
-    setOpen(false);
+
+    if (persistent) {
+      return;
+    }
+
+    setOpen(false, "reference-press");
   };
 
   return (
     <>
+      {/* Floating UI's documented trigger pattern, for the reason given above. */}
+      {/* eslint-disable-next-line @eslint-react/no-clone-element */}
       {cloneElement(trigger, { ...referenceProps, onPointerDown: handlePointerDown })}
 
       {isMounted && (
@@ -194,7 +258,7 @@ export const Tooltip = ({
                   can't sit on .nxm-tooltip without clipping the arrow. */}
               <div
                 className={joinClasses("nxm-tooltip-body", {
-                  "nxm-tooltip-content": customContent === undefined,
+                  "nxm-tooltip-content": !customContent,
                 })}
               >
                 {body}
@@ -202,12 +266,12 @@ export const Tooltip = ({
 
               {showArrow && (
                 <FloatingArrow
-                  className="nxm-tooltip-arrow"
+                  className="nxm-overlay-arrow"
                   context={context}
-                  height={ARROW_HEIGHT}
+                  height={OVERLAY_ARROW_HEIGHT}
                   ref={arrowRef}
-                  strokeWidth={ARROW_STROKE_WIDTH}
-                  width={ARROW_WIDTH}
+                  strokeWidth={OVERLAY_ARROW_STROKE_WIDTH}
+                  width={OVERLAY_ARROW_WIDTH}
                 />
               )}
             </div>

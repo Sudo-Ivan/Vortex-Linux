@@ -1,8 +1,8 @@
 import type { IDownloadURL, IFileUpdate, IRevision, IRevisionQuery } from "@nexusmods/nexus-api";
 import type NexusT from "@nexusmods/nexus-api";
-import { NexusError, RateLimitError } from "@nexusmods/nexus-api";
+import { HTTPError as NexusHTTPError, NexusError, RateLimitError } from "@nexusmods/nexus-api";
 import { getErrorMessageOrDefault } from "@vortex/shared";
-import { DownloadIsHTML } from "@vortex/shared/errors";
+import { parseError } from "@vortex/shared";
 import type { Action } from "redux";
 
 import { setDownloadModInfo } from "../../actions";
@@ -536,6 +536,12 @@ export class NxmProtocol {
       const http = new HTTPError(error.statusCode, error.message, error.request);
       http.stack = error.stack;
       error = http;
+    } else if (error instanceof NexusHTTPError) {
+      const http = new HTTPError(error.statusCode, error.message, error.url);
+      // the api client's message is already "HTTP (code) - message"
+      http.message = error.message;
+      http.stack = error.stack;
+      error = http;
     }
 
     // A 401 means the Nexus client could not authenticate the request and could not (or did not)
@@ -624,7 +630,7 @@ export class NxmProtocol {
     try {
       return await startDownload(this.#api, this.#nexus, url);
     } catch (err) {
-      if (err instanceof DownloadIsHTML || err instanceof UserCanceled) {
+      if (parseError(err).data.kind === "download:is-html" || err instanceof UserCanceled) {
         return undefined;
       }
       // DataInvalid indicates invalid user input or invalid data from remote, so it's

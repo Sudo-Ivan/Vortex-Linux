@@ -38,7 +38,7 @@ These dependencies are only required if you are building the Flatpak package.
 - Arch Linux: `sudo pacman -S flatpak flatpak-builder appstream`
 - NixOS: Included in `nix develop` through [Nix flake]
 
-> [!note]
+> [!NOTE]
 > There is an additional Python-based dependency,
 > `flatpak-node-generator`, but the scripts in `flatpak/scripts/`
 > automatically install it for you when using the full-source path.

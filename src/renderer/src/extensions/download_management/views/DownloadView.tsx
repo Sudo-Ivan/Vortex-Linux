@@ -1,6 +1,6 @@
 import * as path from "path";
 
-import { DownloadIsHTML } from "@vortex/shared/errors";
+import { parseError } from "@vortex/shared";
 import type PromiseBB from "bluebird";
 import type { TFunction } from "i18next";
 import _ from "lodash";
@@ -53,6 +53,7 @@ import { convertGameIdReverse } from "../../nexus_integration/util/convertGameId
 import { setShowDLDropzone, setShowDLGraph } from "../actions/settings";
 import { finishDownload, setDownloadTime } from "../actions/state";
 import type { IDownload } from "../types/IDownload";
+import { friendlyDownloadName } from "../util/downloadNames";
 import getDownloadGames from "../util/getDownloadGames";
 import DownloadGraph from "./DownloadGraph";
 
@@ -418,17 +419,19 @@ class DownloadView extends ComponentEx<IDownloadViewProps, IComponentState> {
     if (err === null) {
       return;
     }
+
     const urlInvalid = ["moved permanently", "forbidden", "gone"];
     const title = resume ? "Failed to resume download" : "Failed to start download";
-    // Semantic filesystem error, normalized in the main process from the raw Node error.
-    const fsReason: string | undefined = err.payload?.reason;
-    if (err instanceof ProcessCanceled) {
-      this.props.onShowError(title, err, undefined, false);
-    } else if (err instanceof UserCanceled) {
+
+    // TODO: remove cases that can never be hit after error rework LAZ-751, LAZ-750, LAZ-747
+    const vortexError = parseError(err);
+    if (vortexError.data.kind === "process-canceled") {
+      this.props.onShowError(title, vortexError, undefined, false);
+    } else if (vortexError.data.kind === "user-canceled") {
       // nop
-    } else if (err instanceof DataInvalid || err instanceof URIError) {
+    } else if (vortexError.data.kind === "data-invalid" || err instanceof URIError) {
       this.props.onShowError(title, err, undefined, false);
-    } else if (err instanceof DownloadIsHTML) {
+    } else if (vortexError.data.kind === "download:is-html") {
       if (resume) {
         this.props.onShowError(
           title,
@@ -526,14 +529,14 @@ class DownloadView extends ComponentEx<IDownloadViewProps, IComponentState> {
         undefined,
         false,
       );
-    } else if (fsReason === "no space") {
+    } else if (err.code === "ENOSPC") {
       this.props.onShowError(title, "The disk is full", undefined, false);
-    } else if (fsReason === "no permissions") {
+    } else if (err.code === "EBADF") {
       this.props.onShowError(
         title,
-        "Vortex doesn't have permission to write the download to disk. " +
-          "Check that the download folder isn't read-only and that another " +
-          "program (such as antivirus) isn't locking the file, then try again.",
+        "Failed to write to disk. If you use a removable media or " +
+          "a network drive, the connection may be unstable. " +
+          "Please try resuming once you checked.",
         undefined,
         false,
       );
@@ -600,7 +603,7 @@ class DownloadView extends ComponentEx<IDownloadViewProps, IComponentState> {
 
     const downloadNames = downloadIds
       .filter((downloadId) => this.getDownload(downloadId) !== undefined)
-      .map((downloadId: string) => this.getDownload(downloadId).localPath);
+      .map((downloadId: string) => friendlyDownloadName(this.getDownload(downloadId)));
 
     onShowDialog(
       "question",
@@ -709,8 +712,11 @@ class DownloadView extends ComponentEx<IDownloadViewProps, IComponentState> {
     }
   };
 
-  private inspect = (downloadId: string) => {
+  private inspect = (downloadIds: string[]) => {
     const { t, onShowDialog } = this.props;
+    // Row actions receive an array of instance ids (see IconBar); take the first.
+    // Passing the array on leaks it into the strictly-validated remove-download event.
+    const downloadId = downloadIds[0];
     const download = this.getDownload(downloadId);
     if (download === undefined) {
       // the download has been removed in the meantime?
@@ -821,10 +827,15 @@ class DownloadView extends ComponentEx<IDownloadViewProps, IComponentState> {
 
   private dropDownload = (type: DropType, dlPaths: string[]) => {
     if (type === "urls") {
+      // A pasted url can't be fetched reliably without a browser: some sites (mega.nz, google
+      // drive, ...) deliver the file through client-side JavaScript as a blob, others sit behind a
+      // challenge/login page. There's no dependable way to tell those apart from a plain download
+      // link up front, so every pasted url goes through the embedded browser. A direct file link
+      // resolves and closes it near-instantly; anything else lets the user complete the download.
       dlPaths.forEach((url) =>
-        this.context.api.events.emit("start-download", [url], {}, undefined, (err: Error) => {
-          this.reportDownloadError(err, false);
-        }),
+        this.context.api.events.emit("browse-download-url", url, (err: Error) =>
+          this.reportDownloadError(err, false),
+        ),
       );
     } else {
       this.context.api.events.emit("import-downloads", dlPaths);

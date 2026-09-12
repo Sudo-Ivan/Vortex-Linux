@@ -6,7 +6,7 @@ import React, {
   useContext,
 } from "react";
 
-import { PageScrollContext } from "./Page.context";
+import { PageContext } from "./Page.context";
 import { PageContent } from "./PageContent";
 
 export type IPageScrollProps = HTMLAttributes<HTMLDivElement> & {
@@ -24,6 +24,9 @@ export type IPageScrollProps = HTMLAttributes<HTMLDivElement> & {
  * It reports its scroll position to the `Page` so a `PageHeader` can show its
  * shadow; any `onScroll` you pass still runs.
  *
+ * A size container, so content that sticks to the region — a table's details
+ * pane, say — can stand as tall as it rather than as tall as what it scrolls.
+ *
  * Focusable, so the region can be scrolled with the keyboard without first
  * tabbing to a focusable child. No focus ring for now — the browser default
  * clashed with the theme. Pass `tabIndex` to override.
@@ -33,7 +36,7 @@ export type IPageScrollProps = HTMLAttributes<HTMLDivElement> & {
  */
 export const PageScroll = forwardRef<HTMLDivElement, IPageScrollProps>(
   ({ children, className, isFullWidth = false, onScroll, ...rest }, ref) => {
-    const context = useContext(PageScrollContext);
+    const context = useContext(PageContext);
 
     const handleScroll = useCallback(
       (event: UIEvent<HTMLDivElement>) => {
@@ -45,7 +48,7 @@ export const PageScroll = forwardRef<HTMLDivElement, IPageScrollProps>(
 
     return (
       <div
-        className="min-h-0 flex-1 overflow-auto outline-none"
+        className="@container-[size] min-h-0 flex-1 overflow-auto outline-none"
         ref={ref}
         tabIndex={0}
         onScroll={handleScroll}

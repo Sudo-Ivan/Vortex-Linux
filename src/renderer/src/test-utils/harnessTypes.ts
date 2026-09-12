@@ -211,7 +211,9 @@ export interface IManagerInternals {
   ) => void;
   maybeAdvancePhase: (sourceModId: string, api: unknown) => void;
   getTerminalModCount: (api: unknown, sourceModId: string) => number;
+  // queued dependency installs, keyed by `${sourceModId}:${downloadId}`
   mPendingInstalls: Map<string, unknown>;
+  // the per-collection cancel callback the completion poll checks, keyed by collection mod id
   mDependencyInstalls: Record<string, () => void>;
 }
 
