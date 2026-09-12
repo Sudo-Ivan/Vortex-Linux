@@ -1857,6 +1857,9 @@ importers:
       '@types/redux-thunk':
         specifier: 'catalog:'
         version: 2.1.0(redux@4.2.1)
+      '@vortex/shared':
+        specifier: workspace:*
+        version: link:../../src/shared
       bluebird:
         specifier: 'catalog:'
         version: 3.7.2
@@ -2730,6 +2733,9 @@ importers:
       '@types/bluebird':
         specifier: 'catalog:'
         version: 3.5.20
+      '@vortex/shared':
+        specifier: workspace:*
+        version: link:../../src/shared
       bluebird:
         specifier: 'catalog:'
         version: 3.7.2
