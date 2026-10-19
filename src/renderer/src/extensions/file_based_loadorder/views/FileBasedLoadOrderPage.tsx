@@ -205,7 +205,7 @@ class FileBasedLoadOrderPage extends ComponentEx<IProps, Record<string, never>> 
           tabListId="fblo-load-orders"
           onSetSelectedTab={(loadOrderId) => this.props.onSelectTab(profile.id, loadOrderId)}
         >
-          <TabBar>
+          <TabBar hasBorder>
             {entries.map((entry) => (
               <TabButton
                 key={entry.loadOrderId}

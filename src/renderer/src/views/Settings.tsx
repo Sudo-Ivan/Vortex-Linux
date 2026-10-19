@@ -159,7 +159,7 @@ export const Settings: React.FC<React.PropsWithChildren<{ active?: boolean; page
 
       <PageScroll className="space-y-6 p-6">
         <TabProvider tab={page ?? ""} tabListId="settings" onSetSelectedTab={setCurrentPage}>
-          <TabBar>
+          <TabBar hasBorder>
             {visibleTabs.map((tabPage) => (
               <TabButton key={tabPage.title} name={t(tabPage.title)} panelId={tabPage.title} />
             ))}

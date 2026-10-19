@@ -12,10 +12,12 @@ import { TabProvider } from "./Tabs.context";
 
 const ControlledTabs = ({
   disabledThird = false,
+  hasBorder,
   initial = "one",
   tabType,
 }: {
   disabledThird?: boolean;
+  hasBorder?: boolean;
   initial?: string;
   tabType?: "primary" | "secondary";
 }) => {
@@ -23,7 +25,7 @@ const ControlledTabs = ({
 
   return (
     <TabProvider tab={tab} tabListId="test" tabType={tabType} onSetSelectedTab={setTab}>
-      <TabBar>
+      <TabBar hasBorder={hasBorder}>
         <TabButton name="One" panelId="one" />
 
         <TabButton count={5} name="Two" panelId="two" />
@@ -133,6 +135,23 @@ describe("Tabs", () => {
     it("applies the secondary bar class when tabType is secondary", () => {
       renderComponent({ tabType: "secondary" });
       expect(document.querySelector(".nxm-tab-bar")).toHaveClass("nxm-tab-bar-secondary");
+    });
+  });
+
+  describe("hasBorder", () => {
+    it("draws no rule under the tabs by default", () => {
+      renderComponent();
+      expect(document.querySelector(".nxm-tab-bar")).not.toHaveClass("nxm-tab-bar-border");
+    });
+
+    it("draws a rule under the tabs with hasBorder", () => {
+      renderComponent({ hasBorder: true });
+      expect(document.querySelector(".nxm-tab-bar")).toHaveClass("nxm-tab-bar-border");
+    });
+
+    it("draws no rule under secondary tabs, even with hasBorder", () => {
+      renderComponent({ hasBorder: true, tabType: "secondary" });
+      expect(document.querySelector(".nxm-tab-bar")).not.toHaveClass("nxm-tab-bar-border");
     });
   });
 

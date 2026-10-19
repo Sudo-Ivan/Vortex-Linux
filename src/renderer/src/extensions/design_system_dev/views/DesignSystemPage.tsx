@@ -71,7 +71,7 @@ export const DesignSystemPage = ({ active, api }: IDesignSystemPageProps) => {
           tabListId="design-system-demo-tabs"
           onSetSelectedTab={setSelectedTab}
         >
-          <TabBar>
+          <TabBar hasBorder>
             <TabButton name="Button" panelId="button" />
 
             <TabButton name="Pill" panelId="pill" />
