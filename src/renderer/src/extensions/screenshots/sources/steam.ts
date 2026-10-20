@@ -68,7 +68,7 @@ async function getLoggedInSteamUsers(steamPath: string): Promise<Record<string, 
   if (!canAccess) return {};
   try {
     const raw = await fs.readFile(steamLoginUsersVDF, { encoding: "utf-8" });
-    const loginUsers = parse(raw) as SteamLoginUsersVDF;
+    const loginUsers = parse(raw) as unknown as SteamLoginUsersVDF;
     return Object.keys(loginUsers.users).reduce((accum, cur) => {
       const accountId = steam64ToAccountId(cur);
       accum[accountId] = loginUsers.users[cur].PersonaName;
@@ -93,7 +93,7 @@ export async function screenshotsFolderBySteamID(
   try {
     await fs.access(screenshotsVDF);
     const raw = await fs.readFile(screenshotsVDF, { encoding: "utf-8" });
-    const parsed = parse(raw) as SteamScreenshotsVDF;
+    const parsed = parse(raw) as unknown as SteamScreenshotsVDF;
     if (
       parsed?.screenshots?.[steamGameId] &&
       Object.keys(parsed?.screenshots?.[steamGameId]).length

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 
 import type { IModListItem } from "@/extensions/news_dashlet/types";
+import { isLoggedIn } from "@/extensions/nexus_integration/selectors";
 import type { IExtensionApi } from "@/types/IExtensionContext";
 import type { IState } from "@/types/IState";
 import { Button } from "@/ui/components/button/Button";
@@ -11,7 +12,6 @@ import { Listing } from "@/ui/components/listing/Listing";
 import { NoResults } from "@/ui/components/no_results/NoResults";
 import { Picker } from "@/ui/components/picker/Picker";
 import { Typography } from "@/ui/components/typography/Typography";
-import { isLoggedIn } from "@/extensions/nexus_integration/selectors";
 
 import { downloadModFromBrowse } from "../util/downloadModFromBrowse";
 
@@ -123,8 +123,7 @@ export function ModBrowsePanel(props: IModBrowsePanelProps) {
     setLoading(true);
     setError(null);
 
-    const fetchMods =
-      feed === "latest" ? api.ext.nexusGetLatestMods : api.ext.nexusGetTrendingMods;
+    const fetchMods = feed === "latest" ? api.ext.nexusGetLatestMods : api.ext.nexusGetTrendingMods;
 
     Promise.resolve(fetchMods?.(gameId))
       .then((result) => {
@@ -179,11 +178,7 @@ export function ModBrowsePanel(props: IModBrowsePanelProps) {
             setRefreshTrigger((prev) => prev + 1);
           }}
         />
-        <Picker
-          options={feedOptions}
-          value={feed}
-          onChange={(value) => setFeed(value)}
-        />
+        <Picker options={feedOptions} value={feed} onChange={(value) => setFeed(value)} />
         <Typography appearance="moderate" brand="neutral-translucent" typographyType="body-sm">
           {t("collection:browse.mods.resultsCount", { total: numeral(mods.length).format("0,0") })}
         </Typography>

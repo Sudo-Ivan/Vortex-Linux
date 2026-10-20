@@ -1,6 +1,5 @@
 import type { IState } from "../../types/IState";
 import { getSafe } from "../../util/storeHelper";
-
 import {
   NEXUS_API_URL,
   NEXUS_BASE_URL,
@@ -47,12 +46,12 @@ export function resolveEndpointsFromSettings(
 ): INexusResolvedEndpoints {
   const merged = { ...DEFAULT_NEXUS_FORK_SETTINGS, ...settings };
   const websiteUrl = stripTrailingSlash(merged.websiteUrl || NEXUS_BASE_URL);
-  const usersUrl = stripTrailingSlash(
-    merged.usersUrl || `https://users.${NEXUS_DOMAIN}`,
-  );
+  const usersUrl = stripTrailingSlash(merged.usersUrl || `https://users.${NEXUS_DOMAIN}`);
   const apiBaseUrl = stripTrailingSlash(merged.apiBaseUrl || defaultApiBaseUrl());
   const oauthUrl = stripTrailingSlash(merged.oauthUrl || OAUTH_URL);
-  const userInfoUrl = stripTrailingSlash(merged.oauthUrl ? `${oauthUrl}/userinfo` : USERINFO_ENDPOINT);
+  const userInfoUrl = stripTrailingSlash(
+    merged.oauthUrl ? `${oauthUrl}/userinfo` : USERINFO_ENDPOINT,
+  );
 
   return {
     apiBaseUrl,

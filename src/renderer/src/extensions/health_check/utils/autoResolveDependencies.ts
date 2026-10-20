@@ -1,7 +1,7 @@
 import { autoResolveDependenciesEnabled } from "@/extensions/nexus_integration/nexusFork";
 import { isLoggedIn } from "@/extensions/nexus_integration/selectors";
-import type { IExtensionApi } from "@/types/IExtensionContext";
 import { log } from "@/logging";
+import type { IExtensionApi } from "@/types/IExtensionContext";
 
 import {
   fileRequirementsCheckResult,
@@ -9,13 +9,13 @@ import {
   isFileRequirementsUserEnabled,
   isModRequirementsEnabled,
 } from "../selectors";
+import { healthCheckContent } from "../views/content/registry";
+import type { IBulkInstallItem } from "../views/content/types";
 import {
   switchActiveVersions,
   type ISwitchTarget,
 } from "./fileRequirements/fileRequirementActions";
 import { switchTargets } from "./fileRequirements/fileRequirementReport";
-import { healthCheckContent } from "../views/content/registry";
-import type { IBulkInstallItem } from "../views/content/types";
 
 function collectInstallAllItems(api: IExtensionApi): IBulkInstallItem[] {
   const state = api.getState();

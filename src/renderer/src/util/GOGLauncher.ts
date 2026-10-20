@@ -29,123 +29,110 @@ class GoGLauncherLinux implements IGameStore {
   public priority: number = STORE_PRIORITY;
   private mHome: string;
   private mScanRootsGetter: () => string[];
-  private mCache: Bluebird<IGameStoreEntry[]>;
+  private mCache: Promise<IGameStoreEntry[]> | undefined;
+  private mSnapshot: IGameStoreSnapshot = { entries: [], isInstalled: true };
 
   constructor(home: string, scanRootsGetter: () => string[]) {
     this.mHome = home;
     this.mScanRootsGetter = scanRootsGetter;
   }
 
-  public findByName(namePattern: string): Bluebird<IGameStoreEntry> {
+  public async findByName(namePattern: string): Promise<IGameStoreEntry> {
     const re = new RegExp("^" + namePattern + "$");
-    return this.allGames()
-      .then((entries) => entries.find((entry) => re.test(entry.name)))
-      .then((entry) => {
-        if (entry === undefined) {
-          return Bluebird.reject(new GameEntryNotFound(namePattern, STORE_ID));
-        }
-        return Bluebird.resolve(entry);
-      });
+    const entry = (await this.allGames()).find((e) => re.test(e.name));
+    if (entry === undefined) {
+      throw new GameEntryNotFound(namePattern, STORE_ID);
+    }
+    return entry;
   }
 
-  public launchGame(appInfo: any, api?: IExtensionApi): Bluebird<void> {
-    return this.getExecInfo(appInfo).then((execInfo) =>
-      api.runExecutable(execInfo.execPath, execInfo.arguments, {
-        cwd: path.dirname(execInfo.execPath),
-        suggestDeploy: true,
-        shell: false,
-      }),
-    );
-  }
-
-  public getExecInfo(appId: string): Bluebird<IExecInfo> {
-    return this.allGames().then((entries) => {
-      const gameEntry = entries.find((entry) => entry.appid === appId);
-      if (gameEntry === undefined) {
-        return Bluebird.reject(new GameEntryNotFound(appId, STORE_ID));
-      }
-
-      return Bluebird.resolve(resolveLinuxLaunchPath(gameEntry.gamePath)).then((launchPath) => {
-        if (launchPath === undefined) {
-          return Bluebird.reject(
-            new Error(`Could not resolve a launch executable for GOG game ${appId}`),
-          );
-        }
-
-        return {
-          execPath: launchPath,
-          arguments: [],
-        };
-      });
+  public async launchGame(appInfo: any, api?: IExtensionApi): Promise<void> {
+    const execInfo = await this.getExecInfo(appInfo);
+    await api.runExecutable(execInfo.execPath, execInfo.arguments, {
+      cwd: path.dirname(execInfo.execPath),
+      suggestDeploy: true,
+      shell: false,
     });
   }
 
-  public findByAppId(appId: string | string[]): Bluebird<IGameStoreEntry> {
+  public async getExecInfo(appId: string): Promise<IExecInfo> {
+    const gameEntry = (await this.allGames()).find((entry) => entry.appid === appId);
+    if (gameEntry === undefined) {
+      throw new GameEntryNotFound(appId, STORE_ID);
+    }
+
+    const launchPath = await resolveLinuxLaunchPath(gameEntry.gamePath);
+    if (launchPath === undefined) {
+      throw new Error(`Could not resolve a launch executable for GOG game ${appId}`);
+    }
+
+    return { execPath: launchPath, arguments: [] };
+  }
+
+  public async findByAppId(appId: string | string[]): Promise<IGameStoreEntry> {
     const matcher = Array.isArray(appId)
       ? (entry: IGameStoreEntry) => appId.includes(entry.appid)
       : (entry: IGameStoreEntry) => appId === entry.appid;
 
-    return this.allGames().then((entries) => {
-      const gameEntry = entries.find(matcher);
-      if (gameEntry === undefined) {
-        return Bluebird.reject(
-          new GameEntryNotFound(Array.isArray(appId) ? appId.join(", ") : appId, STORE_ID),
-        );
-      }
-      return Bluebird.resolve(gameEntry);
-    });
+    const gameEntry = (await this.allGames()).find(matcher);
+    if (gameEntry === undefined) {
+      throw new GameEntryNotFound(Array.isArray(appId) ? appId.join(", ") : appId, STORE_ID);
+    }
+    return gameEntry;
   }
 
-  public allGames(): Bluebird<IGameStoreEntry[]> {
-    if (!this.mCache) {
-      this.mCache = this.getGameEntries();
-    }
+  public allGames(): Promise<IGameStoreEntry[]> {
+    this.mCache ??= this.getGameEntries();
     return this.mCache;
   }
 
-  public reloadGames(): Bluebird<void> {
-    return new Bluebird((resolve) => {
-      this.mCache = this.getGameEntries();
-      resolve();
-    });
+  public async reloadGames(): Promise<void> {
+    this.mCache = this.getGameEntries();
+    await this.mCache;
   }
 
-  public getGameStorePath(): Bluebird<string> {
-    return Bluebird.resolve(undefined);
+  public getGameStorePath(): Promise<string | undefined> {
+    return Promise.resolve(undefined);
   }
 
-  public identifyGame(
+  public async identifyGame(
     gamePath: string,
     fallback: (gamePath: string) => PromiseLike<boolean>,
-  ): Bluebird<boolean> {
-    return Bluebird.resolve(
+  ): Promise<boolean> {
+    const [custom, fallbackResult] = await Promise.all([
       fs
         .readdirAsync(gamePath)
         .then((entries) =>
           entries.some((entry) => entry.startsWith("goggame-") && entry.endsWith(".info")),
         )
         .catch(() => false),
-    ).then((custom) =>
-      Bluebird.resolve(fallback(gamePath)).then((fallbackResult) => {
-        if (custom !== fallbackResult) {
-          log("warn", "(gog) game identification inconclusive", {
-            gamePath,
-            custom,
-            fallback: fallbackResult,
-          });
-        }
-        return custom || fallbackResult;
-      }),
-    );
+      fallback(gamePath),
+    ]);
+
+    if (custom !== fallbackResult) {
+      log("warn", "(gog) game identification inconclusive", {
+        gamePath,
+        custom,
+        fallback: fallbackResult,
+      });
+    }
+
+    return custom || fallbackResult;
   }
 
-  private getGameEntries(): Bluebird<IGameStoreEntry[]> {
-    return Bluebird.resolve(discoverLinuxGogGames(this.mHome, this.mScanRootsGetter())).catch(
-      (err) => {
-        log("error", "gamestore-gog: failed to discover linux gog games", err);
-        return [];
-      },
-    );
+  private async getGameEntries(): Promise<IGameStoreEntry[]> {
+    try {
+      const entries = await discoverLinuxGogGames(this.mHome, this.mScanRootsGetter());
+      this.mSnapshot = { entries, isInstalled: this.mSnapshot.isInstalled };
+      return entries;
+    } catch (err) {
+      log("error", "gamestore-gog: failed to discover linux gog games", err);
+      return [];
+    }
+  }
+
+  public snapshot(): IGameStoreSnapshot {
+    return this.mSnapshot;
   }
 }
 

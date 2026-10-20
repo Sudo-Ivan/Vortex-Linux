@@ -416,7 +416,6 @@ async function gatherDependenciesGraph(
       download: downloadId,
       mod,
       reference: rule.reference,
-      sessionRuleId: modRuleId(rule),
       lookupResults: lookupResults.map((iter) =>
         makeLookupResult(iter as ILookupResult, urlFromHint),
       ),

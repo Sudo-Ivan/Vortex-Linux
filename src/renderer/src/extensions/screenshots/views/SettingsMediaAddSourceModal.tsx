@@ -6,7 +6,7 @@ import { useDispatch } from "react-redux";
 
 import type { IExtensionApi } from "@/types/api";
 import { Button } from "@/ui/components/button/Button";
-import { Input } from "@/ui/components/form/input/Input";
+import { TextField } from "@/ui/components/form/text_field/TextField";
 import { Modal } from "@/ui/components/modal/Modal";
 
 import { addGameMediaSource } from "../actions/persistent";
@@ -68,18 +68,16 @@ export default function SettingsMediaAddSourceModal({
   return (
     <Modal isOpen={visible} size="sm" title="Add Custom Media Source" onClose={onCloseWithReset}>
       <form className="flex flex-col gap-2">
-        <Input
+        <TextField
           required
-          id="media-source-name"
-          label="Source Name"
+          label={t("Source Name")}
           placeholder={t("e.g. My Screenshots")}
           type="text"
           value={sourceName}
           onChange={(e) => setSourceName(e.target.value)}
         />
 
-        <Input
-          id="media-source-description"
+        <TextField
           label={t("Description")}
           placeholder={t("e.g. Images saved to my screenshots folder")}
           type="text"
@@ -88,10 +86,9 @@ export default function SettingsMediaAddSourceModal({
         />
 
         <div className="flex items-end">
-          <Input
+          <TextField
             required
             fieldClassName="grow"
-            id="media-source-path"
             label={t("Folder Path")}
             type="text"
             value={sourcePath}

@@ -1,5 +1,6 @@
 import * as path from "path";
 
+import { getErrorCode, unknownToError } from "@vortex/shared";
 import {
   buildPrefixId,
   buildRunnerId,
@@ -74,8 +75,9 @@ async function readJsonFile<T>(filePath: string): Promise<T | undefined> {
     const data = await fs.readFileAsync(filePath, { encoding: "utf8" });
     return JSON.parse(data) as T;
   } catch (err) {
-    if (err?.code !== "ENOENT") {
-      log("debug", "gamestore-gog: failed to read json file", { filePath, error: err.message });
+    const error = unknownToError(err);
+    if (getErrorCode(error) !== "ENOENT") {
+      log("debug", "gamestore-gog: failed to read json file", { filePath, error: error.message });
     }
     return undefined;
   }

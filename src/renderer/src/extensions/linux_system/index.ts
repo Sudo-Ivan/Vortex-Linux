@@ -1,7 +1,7 @@
 import LazyComponent from "../../controls/LazyComponent";
 import type { IExtensionContext } from "../../types/IExtensionContext";
-import GameStoreHelper from "../../util/GameStoreHelper";
 import { activeGameId } from "../../util/selectors";
+import { getGameStoresSafe } from "../gamemode_management/util/getGame";
 import settingsReducer from "./reducers";
 
 function init(context: IExtensionContext): boolean {
@@ -40,7 +40,8 @@ function init(context: IExtensionContext): boolean {
       const nextRoots = JSON.stringify(context.api.getState().settings.linux?.gogScanRoots ?? []);
       if (nextRoots !== previousRoots) {
         previousRoots = nextRoots;
-        GameStoreHelper.reloadGames(context.api).catch(() => undefined);
+        const gogStore = getGameStoresSafe().find((store) => store.id === "gog");
+        gogStore?.reloadGames().catch(() => undefined);
       }
     });
   });

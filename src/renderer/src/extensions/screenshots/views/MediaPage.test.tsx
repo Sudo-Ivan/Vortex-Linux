@@ -29,6 +29,7 @@ vi.mock("react-redux", async (importOriginal) => {
   return {
     ...(actual as object),
     useDispatch: mockUseDispatch,
+    useSelector: vi.fn(() => undefined),
   };
 });
 

@@ -1,5 +1,5 @@
-import type { IExtensionApi } from "@/types/IExtensionContext";
 import type { IModListItem } from "@/extensions/news_dashlet/types";
+import type { IExtensionApi } from "@/types/IExtensionContext";
 
 function extraValue(mod: IModListItem, id: string): string | number | undefined {
   const entry = mod.extra.find((item) => item.id === id);

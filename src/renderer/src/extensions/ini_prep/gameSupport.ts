@@ -1,8 +1,8 @@
 import * as fs from "node:fs";
 import * as path from "path";
 
-import format from "string-template";
 import { getWineDocumentsPath, pickWineUserName } from "@vortex/shared/linux";
+import format from "string-template";
 
 import getVortexPath from "../../util/getVortexPath";
 import { makeOverlayableDictionary } from "../../util/util";

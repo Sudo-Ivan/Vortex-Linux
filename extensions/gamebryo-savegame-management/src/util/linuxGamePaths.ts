@@ -1,7 +1,12 @@
 import * as path from "path";
 
 import { types, util } from "@nexusmods/vortex-api";
-import { getWineDocumentsPath, inferProtonPathsFromGamePath, myGamesFolderCaseVariants, pickWineUserName } from "@vortex/shared/linux";
+import {
+  getWineDocumentsPath,
+  inferProtonPathsFromGamePath,
+  myGamesFolderCaseVariants,
+  pickWineUserName,
+} from "@vortex/shared/linux";
 
 type Discovery = types.IDiscoveryResult & { winePrefixPath?: string };
 

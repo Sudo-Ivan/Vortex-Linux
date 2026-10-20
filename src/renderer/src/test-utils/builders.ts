@@ -901,6 +901,12 @@ function makeDriverState(overrides: Partial<IDriverHarnessState> = {}): IState {
       interface: { language: "en", foregroundDL: false },
       gameMode: { discovered: slices.discovered },
       mods: { installPath: slices.installPath, activator: {} },
+      nexus: {
+        fork: {
+          disablePremiumGates: false,
+          autoResolveDependencies: false,
+        },
+      },
       profiles: {
         activeProfileId: slices.activeProfileId,
         // a started profile has no switch in flight
