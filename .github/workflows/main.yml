@@ -61,8 +61,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
-        with:
-          submodules: "recursive"
+
+      - name: Fetch comparison base for nx affected
+        if: github.event_name != 'workflow_dispatch'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event_name == 'push' && github.event.before || github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "${BASE_SHA}" ] && [ "${BASE_SHA}" != "0000000000000000000000000000000000000000" ]; then
+            git fetch --depth=1 origin "${BASE_SHA}"
+          fi
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v7
@@ -135,11 +143,21 @@ jobs:
         if: steps.electron-native-cache.outputs.cache-hit != 'true'
         run: pnpm --filter @vortex/main exec electron-rebuild
 
-      - name: Build
-        run: pnpm run build
-
-      - name: Test
-        run: pnpm run test
+      # Affected short-circuits whole-project work: push/PR diffs only build,
+      # lint, typecheck and test the projects their changes touch (plus
+      # dependents). Manual runs get no base, so they stay a full sweep.
+      - name: Build and test
+        env:
+          NX_BASE: ${{ github.event_name == 'push' && github.event.before || github.event.pull_request.base.sha }}
+          NX_HEAD: HEAD
+        run: |
+          if [ -n "${NX_BASE}" ] && [ "${NX_BASE}" != "0000000000000000000000000000000000000000" ]; then
+            pnpm nx affected -t build lint typecheck test test:integration --exclude @vortex/e2e
+            pnpm run assets
+          else
+            pnpm run build
+            pnpm run test
+          fi
 
   # A skipped matrix job reports one unexpanded "build" check, so the required
   # "build (<os>)" checks come from this gate, which always runs.
