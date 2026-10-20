@@ -1,5 +1,4 @@
-import type { FileSystem } from "@nexusmods/adaptor-api/fs";
-
+import type { FileSystem } from "../fs/filesystem";
 import type { SerializedSpan } from "../telemetry/types";
 import type {
   BrowserViewConstructorOptions,
@@ -127,10 +126,8 @@ export interface Api {
   featureFlags: FeatureFlagsApi;
 
   /** Filesystem API */
-  fs: BetterOmit<FileSystem, "enumerateDirectory" | "createStream" | "readFile" | "writeFile">;
+  fs: FileSystem;
 }
-
-type BetterOmit<T, K extends keyof T> = { [P in Exclude<keyof T, K>]: T[P] };
 
 export interface Example {
   /** pong */

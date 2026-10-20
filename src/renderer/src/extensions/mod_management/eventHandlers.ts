@@ -29,7 +29,7 @@ import { showError } from "../../util/message";
 import { downloadPathForGame } from "../../util/selectors";
 import { knownGames } from "../../util/selectors";
 import { getSafe } from "../../util/storeHelper";
-import { batchDispatch, truthy } from "../../util/util";
+import { batchDispatch, makeQueue, truthy } from "../../util/util";
 import { emitModRemoved } from "../analytics/mixpanel/modChangeAnalytics";
 import type { IDownload } from "../download_management/types/IDownload";
 import getDownloadGames from "../download_management/util/getDownloadGames";
@@ -42,6 +42,7 @@ import { setDeploymentNecessary } from "./actions/deployment";
 import { addMod, removeMod } from "./actions/mods";
 import { setActivator } from "./actions/settings";
 import { setInstallPath } from "./actions/settings";
+import { METHOD_UNAVAILABLE_NOTIFICATION_ID } from "./constants";
 import type InstallManager from "./InstallManager";
 import { currentActivator, installPath, installPathForGame } from "./selectors";
 import { ensureStagingDirectory } from "./stagingDirectory";
@@ -55,10 +56,12 @@ import {
   loadActivation,
   purgeDeployedFiles,
   saveActivation,
+  savePurgeLeftovers,
   withActivationLock,
 } from "./util/activationStore";
 import allTypesSupported from "./util/allTypesSupported";
 import { genSubDirFunc, purgeMods } from "./util/deploy";
+import { reportRecordedFailures, resetDeploymentFailures } from "./util/deploymentFailures";
 import {
   getCurrentActivator,
   getSelectedActivator,
@@ -206,16 +209,16 @@ async function purgeOldMethod(
           await oldActivator.purge(instPath, modPaths[typeId], profile.gameId);
         }
       }
-      // save (empty) activation - parallel is fine here, no ordering dependency
+      // another instance's leftovers stay its own
       await Promise.all(
         Object.keys(modPaths).map((typeId) =>
-          saveActivation(
+          savePurgeLeftovers(
             gameId,
             typeId,
             state.app.instanceId,
             modPaths[typeId],
             stagingPath,
-            [],
+            manifests[typeId].instance === state.app.instanceId ? deployments[typeId] : [],
             oldActivator.id,
           ),
         ),
@@ -348,7 +351,7 @@ export function onGameModeActivated(
               activatorToUse = getCurrentActivator(state, newGame, true);
               // cancel out of the activator reset because we have determined to use the
               // one from the manifest
-              api.dismissNotification("deployment-method-unavailable");
+              api.dismissNotification(METHOD_UNAVAILABLE_NOTIFICATION_ID);
               changeActivator = false;
             }
           });
@@ -390,7 +393,7 @@ export function onGameModeActivated(
               "to a different method.",
             method: configuredActivatorId,
           },
-          { allowReport: false, id: "deployment-method-unavailable" },
+          { allowReport: false, id: METHOD_UNAVAILABLE_NOTIFICATION_ID },
         );
       } else {
         const modTypes = Object.keys(modPaths);
@@ -419,7 +422,7 @@ export function onGameModeActivated(
               },
               {
                 allowReport: false,
-                id: "deployment-method-unavailable",
+                id: METHOD_UNAVAILABLE_NOTIFICATION_ID,
                 replace: {
                   method: oldActivator.name,
                 },
@@ -460,6 +463,7 @@ export function onGameModeActivated(
             if (changeActivator) {
               if (supported.length > 0) {
                 api.store.dispatch(setActivator(gameId, (safeFB ?? supported[0]).id));
+                api.dismissNotification(METHOD_UNAVAILABLE_NOTIFICATION_ID);
               }
             }
           });
@@ -560,9 +564,18 @@ function loadOrderRulesChanged(before: IModRule[], after: IModRule[]): boolean {
   const normalizeRules = (input: IModRule[]) =>
     (input ?? [])
       .filter((rule) => types.includes(rule.type))
-      .map((rule) => _.omit(rule, ["idHint", "md5Hint"])).sort;
+      .map((rule) => ({
+        type: rule.type,
+        reference: _.omitBy(
+          _.omit(rule.reference, ["idHint", "md5Hint"]),
+          (value) => value == null,
+        ),
+      }));
 
-  return !_.isEqual(normalizeRules(before), normalizeRules(after));
+  return (
+    _.xorWith(normalizeRules(before), normalizeRules(after), (lhs, rhs) => _.isEqual(lhs, rhs))
+      .length > 0
+  );
 }
 
 export function onModsChanged(api: IExtensionApi, previous: IModTable, current: IModTable) {
@@ -662,8 +675,11 @@ async function undeploy(
     return prev;
   }, {});
 
+  resetDeploymentFailures(api, gameMode);
+
   try {
-    await Promise.all(
+    // all mod types settle before the queue moves on
+    const typeResults = await Promise.allSettled(
       Object.keys(byModTypes).map(async (typeId) => {
         const subdir = genSubDirFunc(game, getModType(typeId));
         const deployPath = modPaths[typeId || ""];
@@ -709,6 +725,13 @@ async function undeploy(
         );
       }),
     );
+    const failed = typeResults.find(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
+    if (failed !== undefined) {
+      throw failed.reason;
+    }
+    reportRecordedFailures(api, gameMode);
   } finally {
     log("debug", "done undeploying single mod", {
       game: gameMode,
@@ -716,6 +739,9 @@ async function undeploy(
     });
   }
 }
+
+// undeploys rewrite the manifest they load, so they run one at a time
+const undeployQueue = makeQueue<void>();
 
 function undeployMods(
   api: IExtensionApi,
@@ -727,7 +753,7 @@ function undeployMods(
   // anyway)
   mods = mods.filter((mod) => mod.installationPath !== undefined);
 
-  return undeploy(api, activators, gameId, mods).catch((err) => {
+  return undeployQueue(() => undeploy(api, activators, gameId, mods), false).catch((err) => {
     if (!["ENOENT", "ENOTFOUND"].includes(getErrorCode(err))) {
       throw err;
     }

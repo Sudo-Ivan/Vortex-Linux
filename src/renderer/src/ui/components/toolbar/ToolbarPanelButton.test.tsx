@@ -1,5 +1,5 @@
 import { mdiTune, mdiViewGrid, mdiViewList } from "@mdi/js";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { describe, expect, it } from "vitest";
@@ -8,14 +8,14 @@ import { Picker } from "@/ui/components/picker/Picker";
 import { PopoverPanelGroup } from "@/ui/components/popover/PopoverPanelGroup";
 import { PopoverPanelGroupItem } from "@/ui/components/popover/PopoverPanelGroupItem";
 
-import { ToolbarPanelButton } from "./ToolbarPanelButton";
+import { type IToolbarPanelHandle, ToolbarPanelButton } from "./ToolbarPanelButton";
 
 // --- Helpers ---
 
 /** The display options panel, whose "Display as" row holds a nested picker. */
 const displayOptions = () => (
   <PopoverPanelGroup>
-    <PopoverPanelGroupItem label="Display as">
+    <PopoverPanelGroupItem passive label="Display as">
       <Picker<string>
         button={{ leftIconPath: mdiViewGrid, size: "sm" }}
         options={[
@@ -40,8 +40,11 @@ const openPanel = async () => {
 
 const panelRow = () => screen.queryByText("Display as");
 
-/** The picker's own trigger, which sits inside the panel and shows the selection. */
-const picker = () => screen.getByRole("button", { name: /Grid/ });
+/**
+ * The picker's own trigger, which sits inside the panel and shows the selection. Named by the
+ * row's label, then itself: "Display as Grid" in a browser, but jsdom drops the self-reference.
+ */
+const picker = () => screen.getByRole("button", { name: /Display as/ });
 
 // --- Tests ---
 
@@ -77,5 +80,23 @@ describe("ToolbarPanelButton", () => {
     await userEvent.keyboard("{Escape}");
 
     await waitFor(() => expect(panelRow()).not.toBeInTheDocument());
+  });
+
+  it("opens its panel from its handle, and leaves it open if it already is", async () => {
+    const handle = React.createRef<IToolbarPanelHandle>();
+    render(
+      <ToolbarPanelButton
+        handle={handle}
+        label="Display options"
+        leftIconPath={mdiTune}
+        panel={displayOptions}
+      />,
+    );
+
+    act(() => handle.current?.open());
+    await waitFor(() => expect(panelRow()).toBeInTheDocument());
+
+    act(() => handle.current?.open());
+    expect(panelRow()).toBeInTheDocument();
   });
 });

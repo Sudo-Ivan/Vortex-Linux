@@ -31,9 +31,9 @@ import { Picker } from "@/ui/components/picker/Picker";
 import { Typography } from "@/ui/components/typography/Typography";
 
 import { Popover } from "./Popover";
+import { PopoverMenu } from "./popover_menu/PopoverMenu";
+import type { IMenuAction } from "./popover_menu/PopoverMenu.types";
 import { PopoverButton } from "./PopoverButton";
-import { PopoverMenu } from "./PopoverMenu";
-import type { IMenuAction } from "./PopoverMenuItem";
 import { PopoverPanel } from "./PopoverPanel";
 import { PopoverPanelGroup } from "./PopoverPanelGroup";
 import { PopoverPanelGroupItem } from "./PopoverPanelGroupItem";
@@ -167,7 +167,7 @@ export const PopoverDemo = () => {
 
             <PopoverPanel className="nxm-popover-panel-controls">
               <PopoverPanelGroup>
-                <PopoverPanelGroupItem label="Display as">
+                <PopoverPanelGroupItem passive label="Display as">
                   <Picker
                     button={{
                       leftIconPath: layout === "list" ? mdiViewList : mdiViewGrid,
@@ -182,11 +182,7 @@ export const PopoverDemo = () => {
 
               <PopoverPanelGroup>
                 <PopoverPanelGroupItem label="Show hidden items">
-                  <Switch
-                    aria-label="Show hidden items"
-                    checked={showHidden}
-                    onChange={setShowHidden}
-                  />
+                  <Switch checked={showHidden} onChange={setShowHidden} />
                 </PopoverPanelGroupItem>
               </PopoverPanelGroup>
 

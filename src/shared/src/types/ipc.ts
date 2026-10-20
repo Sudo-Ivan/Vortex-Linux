@@ -2,9 +2,9 @@
 // Everything in here is compile-time only, meaning the interfaces you find here
 // are never used to create an object. They are only used for type inferrence.
 
-import type { FileSystem } from "@nexusmods/adaptor-api/fs";
-
 import type { SerializedVortexError } from "../errors/serialization";
+import type { FileSystem, Status } from "../fs/filesystem";
+import type { QualifiedPathWire } from "../fs/paths";
 import type { SerializedSpan } from "../telemetry/types";
 import type { DownloadCheckpoint, DownloadProgress, DownloadStatus } from "./download";
 import type {
@@ -656,28 +656,79 @@ export interface InvokeChannels {
   }) => Promise<string>;
 
   "fs:copy": (
-    source: string,
-    target: string,
+    source: QualifiedPathWire,
+    target: QualifiedPathWire,
     options: Parameters<FileSystem["copy"]>[2],
   ) => Promise<void>;
-  "fs:createDirectory": (path: string) => Promise<void>;
+  "fs:createDirectory": (path: QualifiedPathWire) => Promise<void>;
   "fs:createLink": (
-    from: string,
-    to: string,
+    from: QualifiedPathWire,
+    to: QualifiedPathWire,
     type: Parameters<FileSystem["createLink"]>[2],
   ) => Promise<void>;
-  "fs:delete": (path: string) => Promise<void>;
-  "fs:deleteRecursive": (path: string) => Promise<void>;
+  "fs:delete": (path: QualifiedPathWire) => Promise<void>;
+  "fs:deleteRecursive": (path: QualifiedPathWire) => Promise<void>;
+  "fs:readFile": (path: QualifiedPathWire) => Promise<Uint8Array>;
+  "fs:writeFile": (path: QualifiedPathWire, contents: Uint8Array) => Promise<void>;
   "fs:move": (
-    source: string,
-    target: string,
+    source: QualifiedPathWire,
+    target: QualifiedPathWire,
     options: Parameters<FileSystem["move"]>[2],
   ) => Promise<void>;
   "fs:stat": (
-    path: string,
+    path: QualifiedPathWire,
     options: Parameters<FileSystem["stat"]>[1],
-  ) => Promise<Awaited<ReturnType<FileSystem["stat"]>>>;
+  ) => Promise<TemporalWire<Awaited<ReturnType<FileSystem["stat"]>>>>;
+
+  /**
+   * Opens a directory enumeration session on the main process. Returns a
+   * handle the renderer pulls batches of entries through with
+   * {@link InvokeChannels["fs:enumerate-next"]} until done, then releases
+   * with {@link InvokeChannels["fs:enumerate-close"]}.
+   */
+  "fs:enumerate-open": (
+    path: QualifiedPathWire,
+    options?: Parameters<FileSystem["enumerateDirectory"]>[1],
+  ) => Promise<number>;
+  "fs:enumerate-next": (handle: number, max: number) => Promise<EnumerateReply>;
+  "fs:enumerate-close": (handle: number) => Promise<void>;
+
+  /**
+   * Opens a stream session on the main process. Returns a handle the
+   * renderer pulls chunks of bytes through with
+   * {@link InvokeChannels["fs:stream-read"]} (`mode "r"`) or pushes bytes
+   * through with {@link InvokeChannels["fs:stream-write"]} (`mode "w"`)
+   * until done, then releases with
+   * {@link InvokeChannels["fs:stream-close"]}.
+   */
+  "fs:stream-open": (
+    path: QualifiedPathWire,
+    mode: "r" | "w",
+    options?: Parameters<FileSystem["createStream"]>[2],
+  ) => Promise<number>;
+  "fs:stream-read": (handle: number, max: number) => Promise<StreamReadReply>;
+  "fs:stream-write": (handle: number, bytes: Uint8Array) => Promise<void>;
+  "fs:stream-close": (handle: number) => Promise<void>;
 }
+
+/** Wire reply of {@link InvokeChannels["fs:stream-read"]}. `bytes` holds the
+ *  chunks read during this call; sizing is chunk-granular, so a reply may
+ *  exceed `max` by up to one underlying chunk. A `done: true` reply may
+ *  still carry the tail of the file when EOF hit mid-batch. */
+export type StreamReadReply = { done: boolean; bytes: Uint8Array };
+
+export type EnumerateEntryWire = QualifiedPathWire | [QualifiedPathWire, TemporalWire<Status>];
+
+/** Wire reply of {@link InvokeChannels["fs:enumerate-next"]}. Entries are
+ *  always present: a `done: true` reply may still carry the tail of the
+ *  listing when the iterator exhausted mid-batch. */
+export type EnumerateReply = { done: boolean; entries: EnumerateEntryWire[] };
+
+export type TemporalWire<T> = T extends Temporal.Instant
+  ? bigint
+  : T extends object
+    ? { [K in keyof T]: TemporalWire<T[K]> }
+    : T;
 
 /** Represents all IPC-safe typed arrays */
 export type TypedArray =

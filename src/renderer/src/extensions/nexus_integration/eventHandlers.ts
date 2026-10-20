@@ -24,7 +24,7 @@ import type {
   RatingOptions,
 } from "@nexusmods/nexus-api";
 import type Nexus from "@nexusmods/nexus-api";
-import { NexusError, RateLimitError, TimeoutError } from "@nexusmods/nexus-api";
+import { NexusError, TimeoutError } from "@nexusmods/nexus-api";
 import { getErrorMessageOrDefault, parseError, unknownToError } from "@vortex/shared";
 import { AlreadyDownloaded } from "@vortex/shared/errors";
 import Bluebird from "bluebird";
@@ -58,7 +58,8 @@ import { NEXUS_BASE_URL, NEXUS_GAMES_URL } from "./constants";
 import { ensureFreshMembership, refreshMembership } from "./membership";
 import { getNexusWebsiteUrl } from "./nexusFork";
 import { nxmModUrl } from "./NXMUrl";
-import { isLoggedIn, isPremium, allowsInAppDownloads } from "./selectors";
+import { isRateLimited, notifyRateLimited } from "./rateLimit";
+import { allowsInAppDownloads, isLoggedIn, isPremium } from "./selectors";
 import type { IValidateKeyDataV2 } from "./types/IValidateKeyData";
 import {
   checkModVersionsImpl,
@@ -743,6 +744,10 @@ export function onGetNexusCollectionRevision(
         revisionNumber > 0 ? revisionNumber : undefined,
       ),
     ).catch((err: NexusError & { collectionSlug?: string; revisionNumber?: number }) => {
+      if (isRateLimited(err)) {
+        notifyRateLimited(api);
+        return Bluebird.resolve(undefined);
+      }
       const message = getErrorMessageOrDefault(err);
       const isRevisionUnavailable = [
         "NOT_FOUND",
@@ -939,7 +944,7 @@ export function onGetModRequirements(
       })
       .catch((err) => {
         const details = { uidCount: uids.length };
-        if (err instanceof RateLimitError) {
+        if (isRateLimited(err)) {
           log("warn", "Rate limited when fetching mod requirements", details);
         } else if (err instanceof TimeoutError) {
           log("warn", "Timeout when fetching mod requirements", details);
@@ -1336,6 +1341,11 @@ export function onCheckModsVersion(
           }
           return Bluebird.resolve(modIds);
         })
+        .catch(isRateLimited, () => {
+          // before the NexusError catch below, which would report a 429 as an update-check failure
+          notifyRateLimited(api);
+          return Bluebird.resolve([]);
+        })
         .catch(NexusError, (err) => {
           showError(api.store.dispatch, "An error occurred checking for mod updates", err, {
             allowReport: false,
@@ -1344,12 +1354,6 @@ export function onCheckModsVersion(
         })
         .catch(TimeoutError, (err) => {
           showError(api.store.dispatch, "An error occurred checking for mod updates", err, {
-            allowReport: false,
-          });
-          return Bluebird.resolve([]);
-        })
-        .catch(RateLimitError, (err) => {
-          showError(api.store.dispatch, "Rate limit exceeded, please try again later", err, {
             allowReport: false,
           });
           return Bluebird.resolve([]);

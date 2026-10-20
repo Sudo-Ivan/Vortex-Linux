@@ -49,7 +49,7 @@ if (process.env.VORTEX_E2E === "1") {
   }
 }
 
-import type { PathResolver } from "@nexusmods/adaptor-api";
+import { NativePathResolver } from "@vortex/shared/filesystem";
 
 import Application from "./Application";
 import { parseCommandline } from "./cli";
@@ -65,9 +65,8 @@ import {
 } from "./errorReporting";
 import { NodeFileSystemBackendImpl } from "./filesystem/backend";
 import { NodeFileSystemImpl } from "./filesystem/filesystem-impl";
+import { initFileSystem } from "./filesystem/instance";
 import { PathResolverRegistryImpl } from "./filesystem/path-resolver-registry";
-import { LinuxPathProviderImpl } from "./filesystem/paths.linux";
-import { WindowsPathProviderImpl } from "./filesystem/paths.windows";
 import { getVortexPath } from "./getVortexPath";
 import { init as initIpcHandlers } from "./ipcHandlers";
 import { log } from "./logging";
@@ -328,17 +327,13 @@ async function main(): Promise<void> {
   const downloadManager = new DownloadManager({ concurrency: 1 });
   const uploadManager = new UploadManager({ userAgent: `Vortex/${app.getVersion()}` });
 
-  const pathResolvers: PathResolver[] = [];
-  if (process.platform === "win32") {
-    pathResolvers.push(new WindowsPathProviderImpl());
-  } else if (process.platform === "linux") {
-    pathResolvers.push(new LinuxPathProviderImpl());
-  }
-
+  // The registry holds exactly one resolver for the universal `native`
+  // scheme. Path providers are owned by the app, never by the registry.
   const fs = new NodeFileSystemImpl(
     new NodeFileSystemBackendImpl(),
-    new PathResolverRegistryImpl(pathResolvers),
+    new PathResolverRegistryImpl([new NativePathResolver()]),
   );
+  initFileSystem(fs);
 
   initIpcHandlers(fs);
   initDownloadIpc(downloadManager);

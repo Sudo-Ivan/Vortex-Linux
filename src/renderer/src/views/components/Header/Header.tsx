@@ -52,8 +52,8 @@ export const Header: FC<React.PropsWithChildren<unknown>> = () => {
 
   return (
     <div
-      className="flex h-11 items-center justify-between gap-x-6 pl-4.5"
-      style={{ WebkitAppRegion: "drag" }}
+      className="flex h-11 shrink-0 items-center justify-between gap-x-6 pl-4.5 [-webkit-app-region:drag] has-aria-expanded:[-webkit-app-region:no-drag]"
+      data-testid="window-titlebar"
     >
       <div className="flex min-w-0 flex-1 items-center gap-x-1">
         <Tooltip content={menuIsCollapsed ? t("Open menu") : t("Collapse menu")} placement="right">
@@ -61,15 +61,15 @@ export const Header: FC<React.PropsWithChildren<unknown>> = () => {
             appearance="weak"
             aria-label={menuIsCollapsed ? t("Open menu") : t("Collapse menu")}
             brand="neutral"
+            className="[-webkit-app-region:no-drag]"
             leftIconPath={menuIsCollapsed ? nxmPanelOpen : nxmPanelClose}
-            style={{ WebkitAppRegion: "no-drag" }}
             onClick={handleToggleMenu}
           />
         </Tooltip>
 
         <Typography
           brand="none"
-          className="flex grow items-center gap-x-2 overflow-hidden font-semibold whitespace-nowrap"
+          className="flex grow items-center gap-x-2 overflow-hidden font-medium whitespace-nowrap"
         >
           <span className="truncate text-neutral-strong">{title}</span>
 
@@ -79,7 +79,7 @@ export const Header: FC<React.PropsWithChildren<unknown>> = () => {
         </Typography>
       </div>
 
-      <div className="flex shrink-0 items-center gap-x-2" style={{ WebkitAppRegion: "no-drag" }}>
+      <div className="flex shrink-0 items-center gap-x-2 [-webkit-app-region:no-drag]">
         <StagingIndicator />
 
         <VersionIndicator />

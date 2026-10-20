@@ -23,6 +23,7 @@ import {
 } from "@floating-ui/react";
 import React, {
   cloneElement,
+  type CSSProperties,
   isValidElement,
   type PointerEvent as ReactPointerEvent,
   type ReactElement,
@@ -59,7 +60,13 @@ export type ITooltipDelay = number | { close?: number; open?: number };
 interface ITooltipBaseProps {
   /** The trigger. Must forward a ref to a DOM node — wrap bare text in a `span`. */
   children: ReactElement;
+  /** Classes for the tooltip's box, such as one that restyles it. */
   className?: string;
+  /**
+   * Closes when the trigger is pressed, so it never covers a menu the trigger opens.
+   * Turn off for a trigger whose press changes what the tooltip describes.
+   */
+  closeOnPress?: boolean;
   /** Hover delays in ms. A single number sets both open and close. */
   delay?: ITooltipDelay;
   /** Renders the trigger untouched, with no tooltip attached. */
@@ -75,7 +82,12 @@ interface ITooltipBaseProps {
   persistent?: boolean;
   /** Preferred side. Flips and slides automatically when it would overflow. */
   placement?: ITooltipPlacement;
+  /** Classes for the positioned layer, which owns the stacking, e.g. a lower z-index. */
+  positionerClassName?: string;
+  /** Whether it has a beak pointing at its trigger. Default true. */
   showArrow?: boolean;
+  /** Inline styles for the tooltip's box, such as a custom property its class reads. */
+  style?: CSSProperties;
   /** Every open and close, with Floating UI's reason for it. */
   onOpenChange?: (open: boolean, reason?: OpenChangeReason) => void;
 }
@@ -90,6 +102,7 @@ export type ITooltipProps = ITooltipBaseProps &
 export const Tooltip = ({
   children,
   className,
+  closeOnPress = true,
   content,
   customContent,
   delay = { close: 50, open: 250 },
@@ -98,7 +111,9 @@ export const Tooltip = ({
   open: controlledOpen,
   persistent = false,
   placement = "top",
+  positionerClassName,
   showArrow = true,
+  style,
   onOpenChange,
 }: ITooltipProps) => {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
@@ -230,7 +245,7 @@ export const Tooltip = ({
       referenceProps.onPointerDown as ((event: ReactPointerEvent<HTMLElement>) => void) | undefined
     )?.(event);
 
-    if (persistent) {
+    if (persistent || !closeOnPress) {
       return;
     }
 
@@ -246,14 +261,17 @@ export const Tooltip = ({
       {isMounted && (
         <FloatingPortal id={OVERLAY_HOST_ID}>
           <div
-            className={joinClasses("nxm-tooltip-positioner", {
+            className={joinClasses(["nxm-tooltip-positioner", positionerClassName], {
               "nxm-tooltip-positioner-interactive": interactive,
             })}
             ref={refs.setFloating}
             style={floatingStyles}
             {...interactions.getFloatingProps()}
           >
-            <div className={joinClasses(["nxm-tooltip", className])} style={transitionStyles}>
+            <div
+              className={joinClasses(["nxm-tooltip", className])}
+              style={{ ...style, ...transitionStyles }}
+            >
               {/* The wrapper stays for both: it carries the scroll clamp, which
                   can't sit on .nxm-tooltip without clipping the arrow. */}
               <div

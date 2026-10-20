@@ -9,7 +9,7 @@ import { UserCanceled } from "../../util/CustomErrors";
 import * as fs from "../../util/fs";
 import getNormalizeFunc, { type Normalize } from "../../util/getNormalizeFunc";
 import { truthy } from "../../util/util";
-import { MERGED_PATH } from "./modMerging";
+import { mergedSourceName } from "./modMerging";
 import type { IDeployedFile, IDeploymentMethod } from "./types/IDeploymentMethod";
 import type { IMod } from "./types/IMod";
 import type BlacklistSet from "./util/BlacklistSet";
@@ -180,7 +180,7 @@ async function deployMods(
       await method.activate(modPath, mod.installationPath, subDir(mod), skipFiles);
     }
 
-    const mergePath = truthy(typeId) ? MERGED_PATH + "." + typeId : MERGED_PATH;
+    const mergePath = mergedSourceName(typeId);
 
     await method.activate(
       path.join(installationPath, mergePath),

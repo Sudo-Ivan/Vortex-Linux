@@ -37,16 +37,16 @@ This fork is not affiliated with or endorsed by Nexus Mods / Black Tree Gaming L
 
 Ship-and-run focus: build, start, and distribute Vortex on Linux while keeping deltas easy to merge from upstream.
 
-| Area | Change |
-| --- | --- |
-| Packaging | `pnpm run package:linux` builds **zip** + **AppImage** |
-| electron-builder | Linux targets, artifact names, publish to this fork |
-| Dist prepare | Platform-safe `extraResources` (Windows redistributables not required on Linux) |
-| CI | `.github/workflows/package-linux.yml` + `.github/actions/package-linux/` |
-| Flatpak | Prebuilt assemble from `linux-unpacked` (not broken offline yarn source build) |
-| Fork CI | Bundled-actions rebuild falls back to `GITHUB_TOKEN` when Nexus App secrets are absent |
-| GitLab | Stale `build:all` / `lint:ci` scripts mapped to `build` / `lint` |
-| Docs | Linux install, packaging, and upstream-sync notes |
+| Area             | Change                                                                                 |
+| ---------------- | -------------------------------------------------------------------------------------- |
+| Packaging        | `pnpm run package:linux` builds **zip** + **AppImage**                                 |
+| electron-builder | Linux targets, artifact names, publish to this fork                                    |
+| Dist prepare     | Platform-safe `extraResources` (Windows redistributables not required on Linux)        |
+| CI               | `.github/workflows/package-linux.yml` + `.github/actions/package-linux/`               |
+| Flatpak          | Prebuilt assemble from `linux-unpacked` (not broken offline yarn source build)         |
+| Fork CI          | Bundled-actions rebuild falls back to `GITHUB_TOKEN` when Nexus App secrets are absent |
+| GitLab           | Stale `build:all` / `lint:ci` scripts mapped to `build` / `lint`                       |
+| Docs             | Linux install, packaging, and upstream-sync notes                                      |
 
 ### Explicit non-goals (for now)
 
@@ -152,9 +152,8 @@ After a merge, re-check fork-owned paths:
 Setup and local development: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 - Bug Report: If you see an error message or encounter an issue while using our application, please create a [bug report](https://github.com/Sudo-Ivan/Vortex-Linux/issues/new) for Linux packaging, or prefer [upstream](https://github.com/Nexus-Mods/Vortex/issues/new?assignees=&labels=&projects=&template=bug_report.md&title=) for general Vortex bugs.
-- Feature Request: For general product ideas, please submit a [feature request](https://github.com/Nexus-Mods/Vortex/issues/new?assignees=&labels=&projects=&template=feature_request.md&title=) upstream.
-- Review Extension: If you're creating a game extension and need us to review it, please submit a [review extension](https://github.com/Nexus-Mods/Vortex/issues/new?assignees=&labels=extension+%3Agear%3A&projects=&template=review-extension.yaml&title=Review%3A+Game+Name) request upstream.
-- Pull Request: Read [CONTRIBUTING.md](CONTRIBUTING.md) first. For Linux packaging / Flatpak / fork CI, open PRs here. For general Vortex changes, prefer upstream.
+- Feature Request: If you have an idea or if there is a capability that is missing and would make development easier and more robust, please submit a [feature request](https://github.com/Nexus-Mods/Vortex/issues/new?assignees=&labels=&projects=&template=feature_request.md&title=) upstream.
+- Pull Request: Read [CONTRIBUTING.md](CONTRIBUTING.md) first. For Linux packaging / Flatpak / fork CI, open PRs here. Upstream is in the middle of large foundational changes and can only take small pull requests at the moment, so check with them before starting anything big.
 
 ## Developing
 
