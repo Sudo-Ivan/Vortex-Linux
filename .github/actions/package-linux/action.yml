@@ -255,10 +255,9 @@ runs:
           ldd "${fomod_native}" || true
           exit 1
         fi
-        loot_native="$(find ./dist/linux-unpacked/resources/app.asar.unpacked/bundledPlugins/gamebryo-plugin-management -name 'node-loot.node' -print -quit)"
+        loot_native="$(find ./dist/linux-unpacked/resources/app.asar.unpacked -name 'node-loot.node' -print -quit)"
         if [[ -n "${loot_native}" ]]; then
-          loot_so="$(dirname "${loot_native}")/libloot.so"
-          if [[ ! -f "${loot_so}" ]]; then
+          if ! compgen -G "$(dirname "${loot_native}")/libloot.so*" >/dev/null; then
             echo "libloot.so missing beside packaged node-loot.node" >&2
             exit 1
           fi
